@@ -1,0 +1,900 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Africa AI Data Center Analysis — Part 1: Market Readiness &amp; Investment</title>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<style>
+  /* ── Reset & Base ────────────────────────────────────────────── */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: #1a1a2e;
+    color: #e8e8f0;
+    font-family: 'Segoe UI', 'Helvetica Neue', Arial, sans-serif;
+    line-height: 1.6;
+    min-height: 100vh;
+  }
+
+  /* ── Header ──────────────────────────────────────────────────── */
+  .page-header {
+    background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 50%, #162447 100%);
+    border-bottom: 3px solid #e94560;
+    padding: 40px 24px 32px;
+    text-align: center;
+  }
+  .page-header h1 {
+    font-size: clamp(1.5rem, 3vw, 2.4rem);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: #ffffff;
+    margin-bottom: 8px;
+  }
+  .page-header h1 span.accent { color: #e94560; }
+  .page-header .subtitle {
+    font-size: clamp(0.85rem, 1.5vw, 1.1rem);
+    color: #a0a0c0;
+    font-weight: 400;
+  }
+
+  /* Navigation */
+  .nav-links {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+  }
+  .nav-links a {
+    color: #60c0f0;
+    text-decoration: none;
+    font-size: 0.9rem;
+    padding: 8px 20px;
+    border: 1px solid rgba(96, 192, 240, 0.3);
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    background: rgba(96, 192, 240, 0.05);
+  }
+  .nav-links a:hover {
+    background: rgba(96, 192, 240, 0.15);
+    border-color: rgba(96, 192, 240, 0.6);
+    color: #ffffff;
+  }
+  .nav-links a.active {
+    background: rgba(233, 69, 96, 0.15);
+    border-color: #e94560;
+    color: #e94560;
+    font-weight: 600;
+    cursor: default;
+  }
+
+  /* ── Layout ──────────────────────────────────────────────────── */
+  .container {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 32px 24px 64px;
+  }
+
+  /* ── Card ─────────────────────────────────────────────────────── */
+  .chart-card {
+    background: linear-gradient(145deg, #16213e 0%, #1a1a35 100%);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 16px;
+    padding: 32px;
+    margin-bottom: 40px;
+    box-shadow:
+      0 4px 24px rgba(0, 0, 0, 0.35),
+      0 1px 4px rgba(0, 0, 0, 0.2),
+      inset 0 1px 0 rgba(255, 255, 255, 0.04);
+    opacity: 0;
+    transform: translateY(30px);
+    transition: opacity 0.7s ease, transform 0.7s ease;
+  }
+  .chart-card.visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  .chart-card .card-title {
+    font-size: 1.25rem;
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 4px;
+  }
+  .chart-card .card-subtitle {
+    font-size: 0.88rem;
+    color: #8888aa;
+    margin-bottom: 24px;
+  }
+
+  /* ── Insight Callout ─────────────────────────────────────────── */
+  .insight-box {
+    background: linear-gradient(135deg, rgba(233, 69, 96, 0.08) 0%, rgba(96, 192, 240, 0.06) 100%);
+    border-left: 4px solid #e94560;
+    border-radius: 0 10px 10px 0;
+    padding: 16px 20px;
+    margin-top: 24px;
+    font-size: 0.9rem;
+    color: #c8c8e0;
+    line-height: 1.7;
+  }
+  .insight-box strong {
+    color: #e94560;
+    font-weight: 700;
+  }
+
+  /* ── SVG Shared ──────────────────────────────────────────────── */
+  .chart-svg { width: 100%; overflow: visible; }
+
+  /* ── Tooltip ─────────────────────────────────────────────────── */
+  .tooltip {
+    position: fixed;
+    pointer-events: none;
+    background: rgba(10, 10, 30, 0.94);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 8px;
+    padding: 10px 14px;
+    font-size: 0.82rem;
+    color: #e8e8f0;
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    opacity: 0;
+    transition: opacity 0.15s ease;
+    max-width: 260px;
+    line-height: 1.5;
+  }
+  .tooltip.show { opacity: 1; }
+  .tooltip .tt-label {
+    font-weight: 700;
+    color: #ffffff;
+    margin-bottom: 4px;
+  }
+  .tooltip .tt-value { color: #60c0f0; }
+
+  /* ── Radar Responsive ────────────────────────────────────────── */
+  .radar-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+  }
+  @media (max-width: 900px) {
+    .radar-grid { grid-template-columns: 1fr; }
+  }
+  .radar-cell {
+    text-align: center;
+  }
+  .radar-cell h4 {
+    margin-bottom: 8px;
+    font-size: 1rem;
+    font-weight: 600;
+  }
+
+  /* ── Footer ──────────────────────────────────────────────────── */
+  .page-footer {
+    text-align: center;
+    padding: 32px 24px;
+    font-size: 0.78rem;
+    color: #555580;
+    border-top: 1px solid rgba(255,255,255,0.05);
+  }
+
+  /* ── Responsive ──────────────────────────────────────────────── */
+  @media (max-width: 600px) {
+    .chart-card { padding: 20px 16px; }
+    .page-header { padding: 28px 16px 24px; }
+    .container { padding: 20px 12px 40px; }
+  }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     HEADER
+     ═══════════════════════════════════════════════════════════════ -->
+<header class="page-header">
+  <h1>Africa AI Data Center Analysis <span class="accent">&mdash;</span> Part 1: Market Readiness &amp; Investment</h1>
+  <p class="subtitle">AfDB $10B AI Infrastructure Fund &nbsp;|&nbsp; 9 February 2026</p>
+  <nav class="nav-links">
+    <a href="part1-readiness-investment.html" class="active">Part 1 &mdash; Readiness &amp; Investment</a>
+    <a href="part2-infrastructure-risk.html">Part 2 &mdash; Infrastructure &amp; Risk</a>
+    <a href="part3-regulatory-summary.html">Part 3 &mdash; Regulatory &amp; Summary</a>
+  </nav>
+</header>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     MAIN CONTENT
+     ═══════════════════════════════════════════════════════════════ -->
+<main class="container">
+
+  <!-- ── Figure 1 ───────────────────────────────────────────────── -->
+  <section class="chart-card" id="fig1-card">
+    <h3 class="card-title">Figure 1: Overall Readiness Scores by Market</h3>
+    <p class="card-subtitle">Composite index across power, connectivity, regulatory environment, digital demand, and cooling feasibility</p>
+    <div id="fig1"></div>
+    <div class="insight-box">
+      <strong>Key Insight:</strong> South Africa, Kenya, and Egypt lead with scores above 8.0, forming the natural "Tier 1" entry points for the fund. All eight markets score at or above 7.0, indicating continent-wide investability when paired with targeted risk mitigation.
+    </div>
+  </section>
+
+  <!-- ── Figure 2 ───────────────────────────────────────────────── -->
+  <section class="chart-card" id="fig2-card">
+    <h3 class="card-title">Figure 2: Five-Dimension Radar Profiles &mdash; Tier 1 Markets</h3>
+    <p class="card-subtitle">Power Reliability, Fiber Connectivity, Regulatory Environment, Digital Demand, Cooling Feasibility</p>
+    <div id="fig2" class="radar-grid"></div>
+    <div class="insight-box">
+      <strong>Key Insight:</strong> Kenya exhibits the most balanced profile with no dimension below 8. Nigeria's power reliability (5/10) is the single largest risk factor among Tier 1 markets, requiring dedicated on-site generation and battery storage provisions.
+    </div>
+  </section>
+
+  <!-- ── Figure 3 ───────────────────────────────────────────────── -->
+  <section class="chart-card" id="fig3-card">
+    <h3 class="card-title">Figure 3: Proposed Investment Allocation by Market</h3>
+    <p class="card-subtitle">Five-year deployment plan &mdash; total $10B fund with $8.75B allocated, $1.25B reserve</p>
+    <div id="fig3"></div>
+    <div class="insight-box">
+      <strong>Key Insight:</strong> South Africa and Kenya together absorb 57% of the deployed capital, reflecting superior infrastructure readiness and established hyperscaler demand. The $1.25B reserve provides strategic flexibility for emerging opportunities in Senegal, Rwanda, and Tanzania.
+    </div>
+  </section>
+
+  <!-- ── Figure 4 ───────────────────────────────────────────────── -->
+  <section class="chart-card" id="fig4-card">
+    <h3 class="card-title">Figure 4: Power Reliability vs. Fiber Connectivity</h3>
+    <p class="card-subtitle">Bubble size indicates overall readiness score &mdash; quadrant analysis of infrastructure fundamentals</p>
+    <div id="fig4"></div>
+    <div class="insight-box">
+      <strong>Key Insight:</strong> Egypt stands out with the highest fiber throughput (84.5 Mbps) and strong power reliability (8/10). Nigeria's position in the lower-left quadrant underscores the power infrastructure gap that must be addressed to unlock its massive digital demand potential.
+    </div>
+  </section>
+
+  <!-- ── Figure 5 ───────────────────────────────────────────────── -->
+  <section class="chart-card" id="fig5-card">
+    <h3 class="card-title">Figure 5: Estimated Time to Market by Country</h3>
+    <p class="card-subtitle">Months from investment commitment to operational capacity &mdash; phased deployment strategy</p>
+    <div id="fig5"></div>
+    <div class="insight-box">
+      <strong>Key Insight:</strong> Phase 1 markets (South Africa, Kenya, Nigeria, Egypt) can achieve operational status within 24&ndash;30 months, enabling early revenue generation to de-risk subsequent phases. Senegal, at 60 months, may benefit from accelerated timelines via pre-built modular facilities.
+    </div>
+  </section>
+
+</main>
+
+<footer class="page-footer">
+  Africa AI Data Center Analysis &mdash; Prepared for AfDB $10B AI Infrastructure Fund Decision Making &mdash; 9 February 2026<br>
+  Part 1 of 3 &nbsp;|&nbsp; Confidential
+</footer>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     TOOLTIP
+     ═══════════════════════════════════════════════════════════════ -->
+<div class="tooltip" id="tooltip"></div>
+
+<!-- ═══════════════════════════════════════════════════════════════
+     D3 VISUALIZATIONS
+     ═══════════════════════════════════════════════════════════════ -->
+<script>
+/* ================================================================
+   SHARED HELPERS
+   ================================================================ */
+const tooltip = d3.select("#tooltip");
+
+function showTooltip(event, html) {
+  tooltip.html(html).classed("show", true);
+  const tt = tooltip.node();
+  const ttW = tt.offsetWidth;
+  const ttH = tt.offsetHeight;
+  let x = event.clientX + 14;
+  let y = event.clientY - 10;
+  if (x + ttW > window.innerWidth - 12) x = event.clientX - ttW - 14;
+  if (y + ttH > window.innerHeight - 12) y = event.clientY - ttH - 10;
+  if (y < 8) y = 8;
+  tooltip.style("left", x + "px").style("top", y + "px");
+}
+function hideTooltip() { tooltip.classed("show", false); }
+
+/* Intersection Observer for entrance animations */
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      e.target.classList.add("visible");
+      observer.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.12 });
+
+document.querySelectorAll(".chart-card").forEach(c => observer.observe(c));
+
+/* Responsive width helper */
+function containerWidth(sel) {
+  return document.querySelector(sel).getBoundingClientRect().width;
+}
+
+/* ================================================================
+   FIGURE 1 — Horizontal Bar (Readiness Scores)
+   ================================================================ */
+(function drawFig1() {
+  const data = [
+    { code: "SA", name: "South Africa",    score: 8.5 },
+    { code: "KE", name: "Kenya",           score: 8.2 },
+    { code: "EG", name: "Egypt",           score: 8.0 },
+    { code: "NG", name: "Nigeria",         score: 7.8 },
+    { code: "MO", name: "Morocco",         score: 7.5 },
+    { code: "CI", name: "Cote d'Ivoire",   score: 7.2 },
+    { code: "SN", name: "Senegal",         score: 7.1 },
+    { code: "GH", name: "Ghana",           score: 7.0 }
+  ];
+
+  const wrap = d3.select("#fig1");
+  const fullW = Math.min(containerWidth("#fig1-card") - 64, 820);
+  const margin = { top: 20, right: 70, bottom: 30, left: 130 };
+  const width  = fullW - margin.left - margin.right;
+  const height = data.length * 46;
+
+  const svg = wrap.append("svg")
+    .attr("class", "chart-svg")
+    .attr("viewBox", `0 0 ${fullW} ${height + margin.top + margin.bottom}`)
+    .attr("preserveAspectRatio", "xMidYMid meet");
+
+  /* Gradients */
+  const defs = svg.append("defs");
+  const gradGreen = defs.append("linearGradient").attr("id", "barGreen").attr("x1", "0%").attr("x2", "100%");
+  gradGreen.append("stop").attr("offset", "0%").attr("stop-color", "#0f9b58");
+  gradGreen.append("stop").attr("offset", "100%").attr("stop-color", "#34d399");
+
+  const gradAmber = defs.append("linearGradient").attr("id", "barAmber").attr("x1", "0%").attr("x2", "100%");
+  gradAmber.append("stop").attr("offset", "0%").attr("stop-color", "#d97706");
+  gradAmber.append("stop").attr("offset", "100%").attr("stop-color", "#fbbf24");
+
+  const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+  const x = d3.scaleLinear().domain([0, 10]).range([0, width]);
+  const y = d3.scaleBand().domain(data.map(d => d.name)).range([0, height]).padding(0.35);
+
+  /* Grid lines */
+  g.selectAll(".grid-line")
+    .data(x.ticks(5))
+    .join("line")
+    .attr("class", "grid-line")
+    .attr("x1", d => x(d)).attr("x2", d => x(d))
+    .attr("y1", 0).attr("y2", height)
+    .attr("stroke", "rgba(255,255,255,0.06)");
+
+  /* Bars */
+  g.selectAll(".bar")
+    .data(data)
+    .join("rect")
+    .attr("class", "bar")
+    .attr("y", d => y(d.name))
+    .attr("height", y.bandwidth())
+    .attr("x", 0)
+    .attr("rx", 5)
+    .attr("fill", d => d.score >= 8 ? "url(#barGreen)" : "url(#barAmber)")
+    .attr("width", 0)
+    .on("mousemove", (event, d) => {
+      showTooltip(event, `<div class="tt-label">${d.name} (${d.code})</div><div class="tt-value">Readiness: ${d.score} / 10</div><div>${d.score >= 8 ? "Tier 1 — Green" : "Tier 2 — Amber"}</div>`);
+    })
+    .on("mouseleave", hideTooltip)
+    .transition().duration(900).delay((d, i) => i * 80)
+    .attr("width", d => x(d.score));
+
+  /* Value labels */
+  g.selectAll(".val-label")
+    .data(data)
+    .join("text")
+    .attr("x", d => x(d.score) + 8)
+    .attr("y", d => y(d.name) + y.bandwidth() / 2)
+    .attr("dy", "0.35em")
+    .attr("fill", "#ffffff")
+    .attr("font-size", "0.82rem")
+    .attr("font-weight", 700)
+    .attr("opacity", 0)
+    .text(d => d.score.toFixed(1))
+    .transition().duration(600).delay((d, i) => 500 + i * 80)
+    .attr("opacity", 1);
+
+  /* Y axis */
+  g.append("g")
+    .call(d3.axisLeft(y).tickSize(0))
+    .selectAll("text").attr("fill", "#c0c0d8").attr("font-size", "0.82rem");
+  g.select(".domain").remove();
+
+  /* X axis */
+  g.append("g")
+    .attr("transform", `translate(0,${height})`)
+    .call(d3.axisBottom(x).ticks(5).tickFormat(d => d.toFixed(0)))
+    .selectAll("text").attr("fill", "#8888aa").attr("font-size", "0.75rem");
+  g.selectAll(".domain").attr("stroke", "rgba(255,255,255,0.1)");
+  g.selectAll(".tick line").attr("stroke", "rgba(255,255,255,0.08)");
+})();
+
+/* ================================================================
+   FIGURE 2 — Radar / Spider Charts
+   ================================================================ */
+(function drawFig2() {
+  const dims = ["Power Reliability", "Fiber Connectivity", "Regulatory", "Digital Demand", "Cooling"];
+  const countries = [
+    { name: "South Africa", color: "#34d399", values: [7, 9, 8, 10, 8] },
+    { name: "Kenya",        color: "#60a5fa", values: [8, 9, 9,  9, 8] },
+    { name: "Nigeria",      color: "#fbbf24", values: [5, 9, 7, 10, 7] }
+  ];
+
+  const wrap = d3.select("#fig2");
+  const cellW = Math.min(340, (containerWidth("#fig2-card") - 100) / 3);
+  const radius = cellW * 0.38;
+  const levels = 5;
+  const angleSlice = (Math.PI * 2) / dims.length;
+
+  countries.forEach((country) => {
+    const cell = wrap.append("div").attr("class", "radar-cell");
+    cell.append("h4").style("color", country.color).text(country.name);
+
+    const svgSize = cellW;
+    const svg = cell.append("svg")
+      .attr("class", "chart-svg")
+      .attr("viewBox", `0 0 ${svgSize} ${svgSize}`)
+      .attr("preserveAspectRatio", "xMidYMid meet")
+      .style("max-width", svgSize + "px");
+
+    const g = svg.append("g")
+      .attr("transform", `translate(${svgSize / 2},${svgSize / 2})`);
+
+    /* Grid circles */
+    for (let lvl = 1; lvl <= levels; lvl++) {
+      const r = (radius / levels) * lvl;
+      g.append("circle")
+        .attr("r", r)
+        .attr("fill", "none")
+        .attr("stroke", "rgba(255,255,255,0.08)")
+        .attr("stroke-width", 1);
+      /* Level label */
+      g.append("text")
+        .attr("x", 4)
+        .attr("y", -r + 4)
+        .attr("fill", "rgba(255,255,255,0.2)")
+        .attr("font-size", "0.55rem")
+        .text(lvl * 2);
+    }
+
+    /* Axis lines and labels */
+    dims.forEach((dim, i) => {
+      const angle = angleSlice * i - Math.PI / 2;
+      const lx = radius * Math.cos(angle);
+      const ly = radius * Math.sin(angle);
+
+      g.append("line")
+        .attr("x1", 0).attr("y1", 0)
+        .attr("x2", lx).attr("y2", ly)
+        .attr("stroke", "rgba(255,255,255,0.12)")
+        .attr("stroke-width", 1);
+
+      const labelR = radius + 18;
+      const tx = labelR * Math.cos(angle);
+      const ty = labelR * Math.sin(angle);
+
+      g.append("text")
+        .attr("x", tx).attr("y", ty)
+        .attr("text-anchor", "middle")
+        .attr("dominant-baseline", "middle")
+        .attr("fill", "#a0a0c0")
+        .attr("font-size", "0.58rem")
+        .text(dim);
+    });
+
+    /* Data polygon */
+    const line = d3.lineRadial()
+      .radius(d => (d / 10) * radius)
+      .angle((d, i) => i * angleSlice)
+      .curve(d3.curveLinearClosed);
+
+    g.append("path")
+      .datum(country.values)
+      .attr("d", line)
+      .attr("fill", country.color)
+      .attr("fill-opacity", 0.18)
+      .attr("stroke", country.color)
+      .attr("stroke-width", 2)
+      .attr("stroke-opacity", 0)
+      .transition().duration(800)
+      .attr("stroke-opacity", 1);
+
+    /* Data dots */
+    country.values.forEach((val, i) => {
+      const angle = angleSlice * i - Math.PI / 2;
+      const cx = (val / 10) * radius * Math.cos(angle);
+      const cy = (val / 10) * radius * Math.sin(angle);
+
+      g.append("circle")
+        .attr("cx", cx).attr("cy", cy)
+        .attr("r", 4)
+        .attr("fill", country.color)
+        .attr("stroke", "#1a1a2e")
+        .attr("stroke-width", 2)
+        .on("mousemove", (event) => {
+          showTooltip(event, `<div class="tt-label">${country.name}</div><div class="tt-value">${dims[i]}: ${val}/10</div>`);
+        })
+        .on("mouseleave", hideTooltip);
+
+      /* Value label on dot */
+      g.append("text")
+        .attr("x", cx).attr("y", cy - 10)
+        .attr("text-anchor", "middle")
+        .attr("fill", country.color)
+        .attr("font-size", "0.6rem")
+        .attr("font-weight", 700)
+        .text(val);
+    });
+  });
+})();
+
+/* ================================================================
+   FIGURE 3 — Vertical Bar (Investment Volume)
+   ================================================================ */
+(function drawFig3() {
+  const data = [
+    { market: "South Africa",       value: 3.00 },
+    { market: "Kenya",              value: 2.00 },
+    { market: "Nigeria",            value: 1.50 },
+    { market: "Egypt",              value: 1.00 },
+    { market: "Morocco",            value: 0.75 },
+    { market: "Ghana/\nCote d'Iv.", value: 0.50 },
+    { market: "Reserve",            value: 1.25 }
+  ];
+  const total = 10.0;
+
+  const wrap = d3.select("#fig3");
+  const fullW = Math.min(containerWidth("#fig3-card") - 64, 820);
+  const margin = { top: 30, right: 20, bottom: 70, left: 60 };
+  const width  = fullW - margin.left - margin.right;
+  const height = 340;
+
+  const svg = wrap.append("svg")
+    .attr("class", "chart-svg")
+    .attr("viewBox", `0 0 ${fullW} ${height + margin.top + margin.bottom}`)
+    .attr("preserveAspectRatio", "xMidYMid meet");
+
+  const defs = svg.append("defs");
+  const grad = defs.append("linearGradient").attr("id", "barBlueTeal").attr("x1", "0%").attr("x2", "0%").attr("y1", "100%").attr("y2", "0%");
+  grad.append("stop").attr("offset", "0%").attr("stop-color", "#0d6efd");
+  grad.append("stop").attr("offset", "100%").attr("stop-color", "#20c997");
+
+  const gradReserve = defs.append("linearGradient").attr("id", "barReserve").attr("x1", "0%").attr("x2", "0%").attr("y1", "100%").attr("y2", "0%");
+  gradReserve.append("stop").attr("offset", "0%").attr("stop-color", "#4a4a6a");
+  gradReserve.append("stop").attr("offset", "100%").attr("stop-color", "#6a6a8a");
+
+  const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+  const x = d3.scaleBand().domain(data.map(d => d.market)).range([0, width]).padding(0.3);
+  const y = d3.scaleLinear().domain([0, 3.5]).range([height, 0]);
+
+  /* Grid lines */
+  g.selectAll(".grid")
+    .data(y.ticks(7))
+    .join("line")
+    .attr("x1", 0).attr("x2", width)
+    .attr("y1", d => y(d)).attr("y2", d => y(d))
+    .attr("stroke", "rgba(255,255,255,0.06)");
+
+  /* Bars */
+  g.selectAll(".bar")
+    .data(data)
+    .join("rect")
+    .attr("x", d => x(d.market))
+    .attr("width", x.bandwidth())
+    .attr("rx", 5)
+    .attr("ry", 5)
+    .attr("fill", d => d.market === "Reserve" ? "url(#barReserve)" : "url(#barBlueTeal)")
+    .attr("y", height)
+    .attr("height", 0)
+    .on("mousemove", (event, d) => {
+      const pct = ((d.value / total) * 100).toFixed(1);
+      showTooltip(event, `<div class="tt-label">${d.market}</div><div class="tt-value">$${d.value.toFixed(2)}B</div><div>${pct}% of fund</div>`);
+    })
+    .on("mouseleave", hideTooltip)
+    .transition().duration(800).delay((d, i) => i * 100)
+    .attr("y", d => y(d.value))
+    .attr("height", d => height - y(d.value));
+
+  /* Value labels */
+  g.selectAll(".val")
+    .data(data)
+    .join("text")
+    .attr("x", d => x(d.market) + x.bandwidth() / 2)
+    .attr("text-anchor", "middle")
+    .attr("fill", "#ffffff")
+    .attr("font-size", "0.82rem")
+    .attr("font-weight", 700)
+    .attr("opacity", 0)
+    .attr("y", d => y(d.value) - 8)
+    .text(d => `$${d.value.toFixed(2)}B`)
+    .transition().duration(500).delay((d, i) => 600 + i * 100)
+    .attr("opacity", 1);
+
+  /* X axis */
+  const xAxis = g.append("g")
+    .attr("transform", `translate(0,${height})`)
+    .call(d3.axisBottom(x).tickSize(0));
+  xAxis.selectAll("text")
+    .attr("fill", "#c0c0d8").attr("font-size", "0.72rem")
+    .attr("transform", "rotate(-25)")
+    .attr("text-anchor", "end")
+    .attr("dx", "-0.3em").attr("dy", "0.6em");
+  xAxis.select(".domain").attr("stroke", "rgba(255,255,255,0.1)");
+
+  /* Y axis */
+  const yAxis = g.append("g").call(d3.axisLeft(y).ticks(7).tickFormat(d => `$${d}B`));
+  yAxis.selectAll("text").attr("fill", "#8888aa").attr("font-size", "0.72rem");
+  yAxis.select(".domain").attr("stroke", "rgba(255,255,255,0.1)");
+  yAxis.selectAll(".tick line").attr("stroke", "rgba(255,255,255,0.08)");
+
+  /* Total annotation */
+  g.append("text")
+    .attr("x", width)
+    .attr("y", -8)
+    .attr("text-anchor", "end")
+    .attr("fill", "#60c0f0")
+    .attr("font-size", "0.88rem")
+    .attr("font-weight", 700)
+    .text("Total Fund: $10.0B ($8.75B deployed + $1.25B reserve)");
+})();
+
+/* ================================================================
+   FIGURE 4 — Scatter / Bubble Plot
+   ================================================================ */
+(function drawFig4() {
+  const data = [
+    { code: "SA", name: "South Africa",   power: 7, fiber: 48.5, readiness: 8.5 },
+    { code: "KE", name: "Kenya",          power: 7, fiber: 35.0, readiness: 8.2 },
+    { code: "EG", name: "Egypt",          power: 8, fiber: 84.5, readiness: 8.0 },
+    { code: "NG", name: "Nigeria",        power: 5, fiber: 22.0, readiness: 7.8 },
+    { code: "GH", name: "Ghana",          power: 6, fiber: 51.2, readiness: 7.0 },
+    { code: "CI", name: "Cote d'Ivoire",  power: 6, fiber: 59.9, readiness: 7.2 },
+    { code: "SN", name: "Senegal",        power: 7, fiber: 30.0, readiness: 7.1 },
+    { code: "MO", name: "Morocco",        power: 8, fiber: 36.4, readiness: 7.5 }
+  ];
+
+  const wrap = d3.select("#fig4");
+  const fullW = Math.min(containerWidth("#fig4-card") - 64, 820);
+  const margin = { top: 30, right: 40, bottom: 55, left: 60 };
+  const width  = fullW - margin.left - margin.right;
+  const height = 420;
+
+  const svg = wrap.append("svg")
+    .attr("class", "chart-svg")
+    .attr("viewBox", `0 0 ${fullW} ${height + margin.top + margin.bottom}`)
+    .attr("preserveAspectRatio", "xMidYMid meet");
+
+  const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+  const x = d3.scaleLinear().domain([3.5, 9.5]).range([0, width]);
+  const y = d3.scaleLinear().domain([0, 100]).range([height, 0]);
+  const r = d3.scaleSqrt().domain([7, 8.5]).range([14, 32]);
+
+  const colorScale = d => d.readiness >= 8 ? "#34d399" : d.readiness >= 7.5 ? "#60a5fa" : "#fbbf24";
+
+  /* Quadrant medians */
+  const medX = 6.5;
+  const medY = 45;
+
+  /* Quadrant shading */
+  g.append("rect").attr("x", x(medX)).attr("y", 0).attr("width", width - x(medX)).attr("height", y(medY))
+    .attr("fill", "rgba(52,211,153,0.04)");
+  g.append("rect").attr("x", 0).attr("y", y(medY)).attr("width", x(medX)).attr("height", height - y(medY))
+    .attr("fill", "rgba(251,191,36,0.04)");
+
+  /* Quadrant lines */
+  g.append("line").attr("x1", x(medX)).attr("x2", x(medX)).attr("y1", 0).attr("y2", height)
+    .attr("stroke", "rgba(255,255,255,0.12)").attr("stroke-dasharray", "6,4");
+  g.append("line").attr("x1", 0).attr("x2", width).attr("y1", y(medY)).attr("y2", y(medY))
+    .attr("stroke", "rgba(255,255,255,0.12)").attr("stroke-dasharray", "6,4");
+
+  /* Quadrant labels */
+  const qlabelStyle = { fill: "rgba(255,255,255,0.15)", "font-size": "0.7rem", "font-style": "italic" };
+  function qlabel(tx, ty, text) {
+    const t = g.append("text").attr("x", tx).attr("y", ty).attr("text-anchor", "middle").text(text);
+    Object.entries(qlabelStyle).forEach(([k, v]) => t.attr(k, v));
+  }
+  qlabel(x(medX) + (width - x(medX)) / 2, 20, "High Power + High Fiber");
+  qlabel(x(medX) / 2, 20, "Low Power + High Fiber");
+  qlabel(x(medX) + (width - x(medX)) / 2, height - 8, "High Power + Low Fiber");
+  qlabel(x(medX) / 2, height - 8, "Low Power + Low Fiber");
+
+  /* Grid */
+  g.selectAll(".gx").data(x.ticks(6)).join("line")
+    .attr("x1", d => x(d)).attr("x2", d => x(d)).attr("y1", 0).attr("y2", height)
+    .attr("stroke", "rgba(255,255,255,0.04)");
+  g.selectAll(".gy").data(y.ticks(5)).join("line")
+    .attr("x1", 0).attr("x2", width).attr("y1", d => y(d)).attr("y2", d => y(d))
+    .attr("stroke", "rgba(255,255,255,0.04)");
+
+  /* Bubbles */
+  const bubbles = g.selectAll(".bubble")
+    .data(data)
+    .join("g")
+    .attr("transform", d => `translate(${x(d.power)},${y(d.fiber)})`);
+
+  bubbles.append("circle")
+    .attr("r", 0)
+    .attr("fill", d => colorScale(d))
+    .attr("fill-opacity", 0.35)
+    .attr("stroke", d => colorScale(d))
+    .attr("stroke-width", 2)
+    .on("mousemove", (event, d) => {
+      const tier = d.readiness >= 8 ? "Tier 1" : d.readiness >= 7.5 ? "Tier 2" : "Tier 3";
+      showTooltip(event, `<div class="tt-label">${d.name} (${d.code})</div><div class="tt-value">Power: ${d.power}/10 | Fiber: ${d.fiber} Mbps</div><div>Readiness: ${d.readiness} — ${tier}</div>`);
+    })
+    .on("mouseleave", hideTooltip)
+    .transition().duration(700).delay((d, i) => i * 80)
+    .attr("r", d => r(d.readiness));
+
+  /* Country labels */
+  bubbles.append("text")
+    .attr("dy", "0.35em")
+    .attr("text-anchor", "middle")
+    .attr("fill", "#ffffff")
+    .attr("font-size", "0.7rem")
+    .attr("font-weight", 700)
+    .attr("pointer-events", "none")
+    .text(d => d.code);
+
+  /* Axes */
+  const xAx = g.append("g").attr("transform", `translate(0,${height})`).call(d3.axisBottom(x).ticks(6));
+  xAx.selectAll("text").attr("fill", "#8888aa").attr("font-size", "0.72rem");
+  xAx.select(".domain").attr("stroke", "rgba(255,255,255,0.1)");
+  xAx.selectAll(".tick line").attr("stroke", "rgba(255,255,255,0.08)");
+
+  const yAx = g.append("g").call(d3.axisLeft(y).ticks(5).tickFormat(d => d + " Mbps"));
+  yAx.selectAll("text").attr("fill", "#8888aa").attr("font-size", "0.72rem");
+  yAx.select(".domain").attr("stroke", "rgba(255,255,255,0.1)");
+  yAx.selectAll(".tick line").attr("stroke", "rgba(255,255,255,0.08)");
+
+  /* Axis labels */
+  g.append("text").attr("x", width / 2).attr("y", height + 44).attr("text-anchor", "middle")
+    .attr("fill", "#a0a0c0").attr("font-size", "0.82rem").text("Power Reliability Score");
+  g.append("text").attr("transform", "rotate(-90)").attr("x", -height / 2).attr("y", -46)
+    .attr("text-anchor", "middle").attr("fill", "#a0a0c0").attr("font-size", "0.82rem").text("Fiber Connectivity (Mbps)");
+
+  /* Legend */
+  const legend = g.append("g").attr("transform", `translate(${width - 170}, ${height - 80})`);
+  const legendData = [
+    { label: "Tier 1 (8.0+)", color: "#34d399" },
+    { label: "Tier 2 (7.5-7.9)", color: "#60a5fa" },
+    { label: "Tier 3 (<7.5)", color: "#fbbf24" }
+  ];
+  legendData.forEach((d, i) => {
+    legend.append("circle").attr("cx", 0).attr("cy", i * 22).attr("r", 6)
+      .attr("fill", d.color).attr("fill-opacity", 0.5).attr("stroke", d.color);
+    legend.append("text").attr("x", 14).attr("y", i * 22).attr("dy", "0.35em")
+      .attr("fill", "#c0c0d8").attr("font-size", "0.72rem").text(d.label);
+  });
+})();
+
+/* ================================================================
+   FIGURE 5 — Lollipop Chart (Time to Market)
+   ================================================================ */
+(function drawFig5() {
+  const data = [
+    { name: "South Africa",    months: 24 },
+    { name: "Kenya",           months: 30 },
+    { name: "Nigeria",         months: 30 },
+    { name: "Egypt",           months: 30 },
+    { name: "Morocco",         months: 36 },
+    { name: "Ghana",           months: 48 },
+    { name: "Cote d'Ivoire",   months: 48 },
+    { name: "Senegal",         months: 60 }
+  ];
+
+  const phases = [
+    { label: "Phase 1", range: [18, 30], color: "rgba(52,211,153,0.08)", border: "#34d399" },
+    { label: "Phase 2", range: [31, 48], color: "rgba(96,165,250,0.08)", border: "#60a5fa" },
+    { label: "Phase 3", range: [49, 60], color: "rgba(251,191,36,0.08)", border: "#fbbf24" }
+  ];
+
+  const dotColor = d => {
+    if (d.months <= 30) return "#34d399";
+    if (d.months <= 48) return "#60a5fa";
+    return "#fbbf24";
+  };
+
+  const wrap = d3.select("#fig5");
+  const fullW = Math.min(containerWidth("#fig5-card") - 64, 820);
+  const margin = { top: 30, right: 40, bottom: 45, left: 130 };
+  const width  = fullW - margin.left - margin.right;
+  const height = data.length * 50;
+
+  const svg = wrap.append("svg")
+    .attr("class", "chart-svg")
+    .attr("viewBox", `0 0 ${fullW} ${height + margin.top + margin.bottom}`)
+    .attr("preserveAspectRatio", "xMidYMid meet");
+
+  const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+  const x = d3.scaleLinear().domain([0, 66]).range([0, width]);
+  const yScale = d3.scaleBand().domain(data.map(d => d.name)).range([0, height]).padding(0.3);
+
+  /* Phase bands */
+  phases.forEach(ph => {
+    g.append("rect")
+      .attr("x", x(ph.range[0]))
+      .attr("y", 0)
+      .attr("width", x(ph.range[1]) - x(ph.range[0]))
+      .attr("height", height)
+      .attr("fill", ph.color)
+      .attr("rx", 6);
+
+    g.append("text")
+      .attr("x", x((ph.range[0] + ph.range[1]) / 2))
+      .attr("y", -10)
+      .attr("text-anchor", "middle")
+      .attr("fill", ph.border)
+      .attr("font-size", "0.72rem")
+      .attr("font-weight", 600)
+      .text(`${ph.label} (${ph.range[0]}-${ph.range[1]}mo)`);
+  });
+
+  /* Grid lines */
+  g.selectAll(".gx").data(x.ticks(8)).join("line")
+    .attr("x1", d => x(d)).attr("x2", d => x(d)).attr("y1", 0).attr("y2", height)
+    .attr("stroke", "rgba(255,255,255,0.05)");
+
+  /* Lollipop stems */
+  g.selectAll(".stem")
+    .data(data)
+    .join("line")
+    .attr("x1", 0)
+    .attr("y1", d => yScale(d.name) + yScale.bandwidth() / 2)
+    .attr("y2", d => yScale(d.name) + yScale.bandwidth() / 2)
+    .attr("stroke", d => dotColor(d))
+    .attr("stroke-width", 2.5)
+    .attr("stroke-opacity", 0.5)
+    .attr("x2", 0)
+    .transition().duration(800).delay((d, i) => i * 80)
+    .attr("x2", d => x(d.months));
+
+  /* Lollipop dots */
+  g.selectAll(".dot")
+    .data(data)
+    .join("circle")
+    .attr("cy", d => yScale(d.name) + yScale.bandwidth() / 2)
+    .attr("r", 8)
+    .attr("fill", d => dotColor(d))
+    .attr("stroke", "#1a1a2e")
+    .attr("stroke-width", 2.5)
+    .attr("cx", 0)
+    .on("mousemove", (event, d) => {
+      const phase = d.months <= 30 ? "Phase 1" : d.months <= 48 ? "Phase 2" : "Phase 3";
+      showTooltip(event, `<div class="tt-label">${d.name}</div><div class="tt-value">${d.months} months to market</div><div>${phase}</div>`);
+    })
+    .on("mouseleave", hideTooltip)
+    .transition().duration(800).delay((d, i) => i * 80)
+    .attr("cx", d => x(d.months));
+
+  /* Month labels */
+  g.selectAll(".mo-label")
+    .data(data)
+    .join("text")
+    .attr("y", d => yScale(d.name) + yScale.bandwidth() / 2)
+    .attr("dy", "0.35em")
+    .attr("fill", "#ffffff")
+    .attr("font-size", "0.78rem")
+    .attr("font-weight", 700)
+    .attr("opacity", 0)
+    .attr("x", d => x(d.months) + 16)
+    .text(d => d.months + " mo")
+    .transition().duration(500).delay((d, i) => 600 + i * 80)
+    .attr("opacity", 1);
+
+  /* Y axis */
+  const yAx = g.append("g").call(d3.axisLeft(yScale).tickSize(0));
+  yAx.selectAll("text").attr("fill", "#c0c0d8").attr("font-size", "0.82rem");
+  yAx.select(".domain").remove();
+
+  /* X axis */
+  const xAx = g.append("g").attr("transform", `translate(0,${height})`)
+    .call(d3.axisBottom(x).ticks(8).tickFormat(d => d + "mo"));
+  xAx.selectAll("text").attr("fill", "#8888aa").attr("font-size", "0.72rem");
+  xAx.select(".domain").attr("stroke", "rgba(255,255,255,0.1)");
+  xAx.selectAll(".tick line").attr("stroke", "rgba(255,255,255,0.08)");
+})();
+
+</script>
+</body>
+</html>

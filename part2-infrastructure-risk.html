@@ -1,0 +1,1363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Africa AI Data Center Analysis — Part 2: Infrastructure & Risk</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        *, *::before, *::after {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            background: #1a1a2e;
+            color: #e0e0e0;
+            font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, 'Helvetica Neue', Arial, sans-serif;
+            line-height: 1.6;
+            min-height: 100vh;
+        }
+
+        /* Header */
+        .header {
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a2e 40%, #16213e 100%);
+            border-bottom: 2px solid rgba(0, 150, 255, 0.3);
+            padding: 40px 20px 30px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #0096ff, #00d4aa, #f0c040, #0096ff);
+            background-size: 300% 100%;
+            animation: shimmer 4s ease-in-out infinite;
+        }
+
+        @keyframes shimmer {
+            0%, 100% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+        }
+
+        .header-badge {
+            display: inline-block;
+            background: rgba(0, 150, 255, 0.15);
+            border: 1px solid rgba(0, 150, 255, 0.3);
+            border-radius: 20px;
+            padding: 4px 16px;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #0096ff;
+            margin-bottom: 16px;
+        }
+
+        .header h1 {
+            font-size: 32px;
+            font-weight: 300;
+            color: #ffffff;
+            margin-bottom: 6px;
+            letter-spacing: 0.5px;
+        }
+
+        .header h1 span {
+            font-weight: 700;
+            background: linear-gradient(135deg, #0096ff, #00d4aa);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .header .subtitle {
+            font-size: 15px;
+            color: #8899aa;
+            font-weight: 400;
+        }
+
+        .header .subtitle strong {
+            color: #f0c040;
+            font-weight: 600;
+        }
+
+        /* Navigation */
+        .nav-bar {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-top: 20px;
+            flex-wrap: wrap;
+        }
+
+        .nav-link {
+            display: inline-block;
+            padding: 8px 20px;
+            border-radius: 6px;
+            font-size: 13px;
+            font-weight: 500;
+            text-decoration: none;
+            transition: all 0.25s ease;
+            letter-spacing: 0.3px;
+        }
+
+        .nav-link.other {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #8899aa;
+        }
+
+        .nav-link.other:hover {
+            background: rgba(0, 150, 255, 0.1);
+            border-color: rgba(0, 150, 255, 0.3);
+            color: #ffffff;
+        }
+
+        .nav-link.active {
+            background: linear-gradient(135deg, rgba(0, 150, 255, 0.2), rgba(0, 212, 170, 0.15));
+            border: 1px solid rgba(0, 150, 255, 0.4);
+            color: #ffffff;
+            cursor: default;
+        }
+
+        /* Main content */
+        .content {
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 40px 20px 60px;
+        }
+
+        /* Chart Card */
+        .chart-card {
+            background: linear-gradient(145deg, rgba(22, 33, 62, 0.95), rgba(15, 15, 35, 0.95));
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 48px;
+            box-shadow:
+                0 4px 24px rgba(0, 0, 0, 0.3),
+                0 1px 2px rgba(0, 0, 0, 0.2),
+                inset 0 1px 0 rgba(255, 255, 255, 0.04);
+            opacity: 0;
+            transform: translateY(30px);
+            transition: opacity 0.7s ease, transform 0.7s ease;
+        }
+
+        .chart-card.visible {
+            opacity: 1;
+            transform: translateY(0);
+        }
+
+        .chart-card .chart-header {
+            margin-bottom: 24px;
+        }
+
+        .chart-card .figure-label {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 2.5px;
+            text-transform: uppercase;
+            color: #0096ff;
+            margin-bottom: 6px;
+        }
+
+        .chart-card .chart-title {
+            font-size: 22px;
+            font-weight: 600;
+            color: #ffffff;
+            margin-bottom: 4px;
+        }
+
+        .chart-card .chart-subtitle {
+            font-size: 13px;
+            color: #6b7b8d;
+            font-weight: 400;
+        }
+
+        .chart-container {
+            width: 100%;
+            overflow: visible;
+        }
+
+        .chart-container svg {
+            width: 100%;
+            display: block;
+        }
+
+        /* Insight Box */
+        .insight-box {
+            margin-top: 20px;
+            padding: 16px 20px;
+            background: linear-gradient(135deg, rgba(0, 150, 255, 0.08), rgba(0, 212, 170, 0.06));
+            border-left: 3px solid #0096ff;
+            border-radius: 0 10px 10px 0;
+            font-size: 13.5px;
+            line-height: 1.65;
+            color: #c0ccdd;
+        }
+
+        .insight-box .insight-label {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: #0096ff;
+            margin-bottom: 5px;
+        }
+
+        .insight-box strong {
+            color: #ffffff;
+            font-weight: 600;
+        }
+
+        .insight-box .highlight {
+            color: #f0c040;
+            font-weight: 600;
+        }
+
+        /* Tooltip */
+        .tooltip {
+            position: fixed;
+            pointer-events: none;
+            background: rgba(10, 10, 25, 0.95);
+            border: 1px solid rgba(0, 150, 255, 0.35);
+            border-radius: 8px;
+            padding: 10px 14px;
+            font-size: 12.5px;
+            line-height: 1.5;
+            color: #e0e0e0;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5);
+            z-index: 9999;
+            max-width: 260px;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .tooltip.show {
+            opacity: 1;
+        }
+
+        .tooltip .tt-title {
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 4px;
+            font-size: 13px;
+        }
+
+        .tooltip .tt-value {
+            color: #0096ff;
+            font-weight: 600;
+        }
+
+        /* Axis Styles */
+        .axis text {
+            fill: #8899aa;
+            font-size: 12px;
+        }
+
+        .axis path,
+        .axis line {
+            stroke: rgba(255, 255, 255, 0.1);
+        }
+
+        .axis-label {
+            fill: #6b7b8d;
+            font-size: 11px;
+            font-weight: 500;
+        }
+
+        /* Grid lines */
+        .grid line {
+            stroke: rgba(255, 255, 255, 0.06);
+        }
+
+        .grid path {
+            stroke: none;
+        }
+
+        /* Annotation */
+        .annotation-line {
+            stroke: rgba(240, 192, 64, 0.5);
+            stroke-width: 1;
+            stroke-dasharray: 4 3;
+        }
+
+        .annotation-text {
+            fill: #f0c040;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        /* Quadrant labels */
+        .quadrant-label {
+            fill: rgba(255, 255, 255, 0.12);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+        }
+
+        .quadrant-line {
+            stroke: rgba(255, 255, 255, 0.12);
+            stroke-width: 1;
+            stroke-dasharray: 6 4;
+        }
+
+        /* Treemap */
+        .treemap-label-country {
+            fill: #ffffff;
+            font-weight: 700;
+            font-size: 15px;
+        }
+
+        .treemap-label-amount {
+            fill: rgba(255, 255, 255, 0.85);
+            font-weight: 500;
+            font-size: 13px;
+        }
+
+        .treemap-label-pct {
+            fill: rgba(255, 255, 255, 0.65);
+            font-weight: 400;
+            font-size: 11px;
+        }
+
+        /* Footer */
+        .footer {
+            text-align: center;
+            padding: 30px 20px 40px;
+            border-top: 1px solid rgba(255, 255, 255, 0.06);
+            color: #4a5568;
+            font-size: 12px;
+        }
+
+        .footer a {
+            color: #0096ff;
+            text-decoration: none;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 22px;
+            }
+            .chart-card {
+                padding: 20px 16px;
+            }
+            .chart-card .chart-title {
+                font-size: 18px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<!-- Tooltip -->
+<div class="tooltip" id="tooltip"></div>
+
+<!-- Header -->
+<header class="header">
+    <div class="header-badge">Part 2 of 3 &mdash; Confidential</div>
+    <h1>Africa AI Data Center Analysis &mdash; <span>Infrastructure &amp; Risk</span></h1>
+    <p class="subtitle">AfDB <strong>$10B AI Infrastructure Fund</strong> &nbsp;|&nbsp; 9 February 2026</p>
+
+    <nav class="nav-bar">
+        <a href="part1-market-opportunity.html" class="nav-link other">Part 1: Market &amp; Opportunity</a>
+        <a href="part2-infrastructure-risk.html" class="nav-link active">Part 2: Infrastructure &amp; Risk</a>
+        <a href="part3-strategy-recommendations.html" class="nav-link other">Part 3: Strategy &amp; Recommendations</a>
+    </nav>
+</header>
+
+<!-- Content -->
+<div class="content">
+
+    <!-- ===== Figure 6: Cooling Efficiency ===== -->
+    <div class="chart-card" id="card-fig6">
+        <div class="chart-header">
+            <div class="figure-label">Figure 6</div>
+            <div class="chart-title">Cooling Efficiency by Climate Zone</div>
+            <div class="chart-subtitle">Annual Cooling Operating Cost Relative Index (lower is better)</div>
+        </div>
+        <div class="chart-container" id="chart-fig6"></div>
+        <div class="insight-box">
+            <div class="insight-label">Key Insight</div>
+            <strong>Kenya (Nairobi, altitude 1,795m) enables free cooling</strong> for significant portions of the year, yielding a <span class="highlight">25&ndash;30% savings</span> versus coastal tropical locations like Lagos, Nigeria. Egypt&rsquo;s desert climate drives the highest cooling costs despite strong grid reliability.
+        </div>
+    </div>
+
+    <!-- ===== Figure 7: Regional Distribution ===== -->
+    <div class="chart-card" id="card-fig7">
+        <div class="chart-header">
+            <div class="figure-label">Figure 7</div>
+            <div class="chart-title">Regional Investment Distribution</div>
+            <div class="chart-subtitle">$10B Fund Allocation by African Sub-Region (Proportional Treemap)</div>
+        </div>
+        <div class="chart-container" id="chart-fig7"></div>
+        <div class="insight-box">
+            <div class="insight-label">Key Insight</div>
+            Investments span four of five African sub-regions. <strong>Southern Africa leads at 34%</strong> driven by South Africa&rsquo;s established infrastructure. <span class="highlight">Central Africa receives $0 allocation</span> due to insufficient power infrastructure, regulatory gaps, and connectivity limitations &mdash; representing a future expansion opportunity once fundamentals improve.
+        </div>
+    </div>
+
+    <!-- ===== Figure 8: Risk vs Return ===== -->
+    <div class="chart-card" id="card-fig8">
+        <div class="chart-header">
+            <div class="figure-label">Figure 8</div>
+            <div class="chart-title">Risk vs. Return Profile</div>
+            <div class="chart-subtitle">Expected IRR (%) vs. Risk Level (1&ndash;5 scale) &mdash; Bubble size = Investment allocation</div>
+        </div>
+        <div class="chart-container" id="chart-fig8"></div>
+        <div class="insight-box">
+            <div class="insight-label">Key Insight</div>
+            <strong>Kenya occupies the optimal position</strong> with high expected returns (20% IRR) and low risk (2/5). Nigeria offers the highest potential IRR (25%) but at maximum risk (5/5), requiring <span class="highlight">specialized risk mitigation structures</span>. South Africa delivers reliable 15% returns with institutional-grade stability.
+        </div>
+    </div>
+
+    <!-- ===== Figure 9: Power Reliability ===== -->
+    <div class="chart-card" id="card-fig9">
+        <div class="chart-header">
+            <div class="figure-label">Figure 9</div>
+            <div class="chart-title">Power Reliability Comparison</div>
+            <div class="chart-subtitle">Grid Reliability Score (1&ndash;10 scale) &mdash; Traffic Light Coding</div>
+        </div>
+        <div class="chart-container" id="chart-fig9"></div>
+        <div class="insight-box">
+            <div class="insight-label">Key Insight</div>
+            <strong>Egypt and Morocco lead with 8.0/10 grid reliability,</strong> benefiting from sustained national grid investment. Nigeria&rsquo;s 5.0 score means <span class="highlight">3&ndash;4x backup power investment required</span>, significantly impacting TCO. <strong>Senegal ranks #1</strong> and <strong>Kenya #2</strong> on the Electricity Regulatory Index (ERI: 0.892 and 0.889 respectively), signalling strong regulatory frameworks supporting reliability improvements.
+        </div>
+    </div>
+
+</div>
+
+<!-- Footer -->
+<div class="footer">
+    <p>Africa AI Data Center Analysis &mdash; Prepared for AfDB $10B AI Infrastructure Fund Decision Making</p>
+    <p style="margin-top:4px;">9 February 2026 &nbsp;|&nbsp; <a href="part1-market-opportunity.html">Part 1</a> &nbsp;&middot;&nbsp; Part 2 &nbsp;&middot;&nbsp; <a href="part3-strategy-recommendations.html">Part 3</a></p>
+</div>
+
+<script>
+// ============================================================
+// GLOBAL HELPERS
+// ============================================================
+const tooltip = d3.select('#tooltip');
+
+function showTooltip(event, html) {
+    tooltip.html(html).classed('show', true);
+    const ttNode = tooltip.node();
+    const ttRect = ttNode.getBoundingClientRect();
+    let x = event.clientX + 14;
+    let y = event.clientY - 10;
+    if (x + ttRect.width > window.innerWidth - 10) x = event.clientX - ttRect.width - 14;
+    if (y + ttRect.height > window.innerHeight - 10) y = event.clientY - ttRect.height - 10;
+    if (y < 10) y = 10;
+    tooltip.style('left', x + 'px').style('top', y + 'px');
+}
+
+function hideTooltip() {
+    tooltip.classed('show', false);
+}
+
+// Animate cards on scroll
+function animateCards() {
+    document.querySelectorAll('.chart-card').forEach(card => {
+        const rect = card.getBoundingClientRect();
+        if (rect.top < window.innerHeight - 60) {
+            card.classList.add('visible');
+        }
+    });
+}
+window.addEventListener('scroll', animateCards);
+window.addEventListener('load', () => setTimeout(animateCards, 100));
+
+// ============================================================
+// FIGURE 6: Cooling Efficiency
+// ============================================================
+(function() {
+    const data = [
+        { country: 'Kenya',          value: 1.2, note: 'Nairobi (1,795m altitude)' },
+        { country: 'Morocco',        value: 1.3, note: 'Mediterranean climate' },
+        { country: 'South Africa',   value: 1.4, note: 'Temperate highland' },
+        { country: 'Ghana',          value: 1.4, note: 'Coastal tropical' },
+        { country: "Cote d'Ivoire",  value: 1.4, note: 'Coastal tropical' },
+        { country: 'Senegal',        value: 1.3, note: 'Semi-arid coastal' },
+        { country: 'Nigeria',        value: 1.6, note: 'Humid tropical (Lagos)' },
+        { country: 'Egypt',          value: 2.0, note: 'Desert (reference max)' }
+    ];
+
+    data.sort((a, b) => a.value - b.value);
+
+    const container = document.getElementById('chart-fig6');
+    const margin = { top: 20, right: 80, bottom: 40, left: 120 };
+    const width = Math.min(container.clientWidth, 1040) - margin.left - margin.right;
+    const height = data.length * 48;
+
+    const svg = d3.select('#chart-fig6')
+        .append('svg')
+        .attr('viewBox', `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom}`)
+        .attr('preserveAspectRatio', 'xMidYMid meet')
+        .append('g')
+        .attr('transform', `translate(${margin.left},${margin.top})`);
+
+    // Gradient defs
+    const defs = svg.append('defs');
+
+    data.forEach((d, i) => {
+        const grad = defs.append('linearGradient')
+            .attr('id', `cool-grad-${i}`)
+            .attr('x1', '0%').attr('x2', '100%');
+
+        const t = (d.value - 1.0) / (2.0 - 1.0);
+        const startColor = d3.interpolateRgb('#1e88e5', '#ff5252')(Math.max(0, t - 0.15));
+        const endColor = d3.interpolateRgb('#1e88e5', '#ff5252')(t);
+
+        grad.append('stop').attr('offset', '0%').attr('stop-color', startColor).attr('stop-opacity', 0.85);
+        grad.append('stop').attr('offset', '100%').attr('stop-color', endColor).attr('stop-opacity', 1);
+    });
+
+    const x = d3.scaleLinear().domain([0, 2.2]).range([0, width]);
+    const y = d3.scaleBand().domain(data.map(d => d.country)).range([0, height]).padding(0.3);
+
+    // Grid
+    svg.append('g')
+        .attr('class', 'grid')
+        .call(d3.axisBottom(x).ticks(6).tickSize(height).tickFormat(''))
+        .attr('transform', `translate(0,0)`);
+
+    // X axis
+    svg.append('g')
+        .attr('class', 'axis')
+        .attr('transform', `translate(0,${height})`)
+        .call(d3.axisBottom(x).ticks(6).tickFormat(d => d.toFixed(1)));
+
+    svg.append('text')
+        .attr('class', 'axis-label')
+        .attr('x', width / 2)
+        .attr('y', height + 36)
+        .attr('text-anchor', 'middle')
+        .text('Relative Cooling Cost Index');
+
+    // Y axis
+    svg.append('g')
+        .attr('class', 'axis')
+        .call(d3.axisLeft(y).tickSize(0))
+        .select('.domain').remove();
+
+    // Bars
+    svg.selectAll('.bar')
+        .data(data)
+        .join('rect')
+        .attr('class', 'bar')
+        .attr('x', 0)
+        .attr('y', d => y(d.country))
+        .attr('height', y.bandwidth())
+        .attr('rx', 4)
+        .attr('ry', 4)
+        .attr('fill', (d, i) => `url(#cool-grad-${i})`)
+        .attr('width', 0)
+        .on('mousemove', function(event, d) {
+            d3.select(this).attr('opacity', 0.8);
+            showTooltip(event, `
+                <div class="tt-title">${d.country}</div>
+                <div>${d.note}</div>
+                <div style="margin-top:4px">Cooling Index: <span class="tt-value">${d.value.toFixed(1)}</span></div>
+            `);
+        })
+        .on('mouseleave', function() {
+            d3.select(this).attr('opacity', 1);
+            hideTooltip();
+        })
+        .transition()
+        .duration(900)
+        .delay((d, i) => i * 80)
+        .ease(d3.easeCubicOut)
+        .attr('width', d => x(d.value));
+
+    // Value labels
+    svg.selectAll('.val-label')
+        .data(data)
+        .join('text')
+        .attr('x', d => x(d.value) + 6)
+        .attr('y', d => y(d.country) + y.bandwidth() / 2)
+        .attr('dy', '0.35em')
+        .attr('fill', '#ffffff')
+        .attr('font-size', '12px')
+        .attr('font-weight', '600')
+        .attr('opacity', 0)
+        .text(d => d.value.toFixed(1))
+        .transition()
+        .duration(600)
+        .delay((d, i) => 400 + i * 80)
+        .attr('opacity', 1);
+
+    // Annotation: Kenya vs Nigeria
+    const kenyaY = y('Kenya') + y.bandwidth() / 2;
+    const nigeriaY = y('Nigeria') + y.bandwidth() / 2;
+    const annotX = x(1.8);
+
+    svg.append('line')
+        .attr('class', 'annotation-line')
+        .attr('x1', annotX).attr('x2', annotX)
+        .attr('y1', kenyaY).attr('y2', nigeriaY);
+
+    svg.append('line')
+        .attr('class', 'annotation-line')
+        .attr('x1', annotX - 6).attr('x2', annotX + 6)
+        .attr('y1', kenyaY).attr('y2', kenyaY);
+
+    svg.append('line')
+        .attr('class', 'annotation-line')
+        .attr('x1', annotX - 6).attr('x2', annotX + 6)
+        .attr('y1', nigeriaY).attr('y2', nigeriaY);
+
+    svg.append('text')
+        .attr('class', 'annotation-text')
+        .attr('x', annotX + 10)
+        .attr('y', (kenyaY + nigeriaY) / 2)
+        .attr('dy', '0.35em')
+        .attr('font-size', '11px')
+        .text('25-30% savings');
+
+    // Egypt annotation
+    const egyptY = y('Egypt') + y.bandwidth() / 2;
+    svg.append('text')
+        .attr('x', x(2.0) + 28)
+        .attr('y', egyptY)
+        .attr('dy', '0.35em')
+        .attr('fill', '#ff5252')
+        .attr('font-size', '10px')
+        .attr('font-weight', '600')
+        .text('REF MAX');
+
+})();
+
+// ============================================================
+// FIGURE 7: Regional Distribution Treemap
+// ============================================================
+(function() {
+    const regionData = {
+        name: 'Total',
+        children: [
+            {
+                name: 'Southern Africa',
+                value: 3.0,
+                pct: '34%',
+                color: '#1e88e5',
+                details: 'South Africa',
+                children: [
+                    { name: 'South Africa', value: 3.0, pct: '34%' }
+                ]
+            },
+            {
+                name: 'West Africa',
+                value: 2.5,
+                pct: '29%',
+                color: '#00c853',
+                details: 'Nigeria $1.5B, Ghana/CI $0.5B, reserves',
+                children: [
+                    { name: 'Nigeria', value: 1.5, pct: '17%' },
+                    { name: 'Ghana / CI', value: 0.5, pct: '6%' },
+                    { name: 'Reserve', value: 0.5, pct: '6%' }
+                ]
+            },
+            {
+                name: 'East Africa',
+                value: 2.0,
+                pct: '23%',
+                color: '#f0c040',
+                details: 'Kenya',
+                children: [
+                    { name: 'Kenya', value: 2.0, pct: '23%' }
+                ]
+            },
+            {
+                name: 'North Africa',
+                value: 1.75,
+                pct: '20%',
+                color: '#ff7043',
+                details: 'Egypt $1.0B, Morocco $0.75B',
+                children: [
+                    { name: 'Egypt', value: 1.0, pct: '11%' },
+                    { name: 'Morocco', value: 0.75, pct: '9%' }
+                ]
+            }
+        ]
+    };
+
+    const container = document.getElementById('chart-fig7');
+    const totalWidth = Math.min(container.clientWidth, 1040);
+    const totalHeight = 440;
+    const margin = { top: 10, right: 10, bottom: 50, left: 10 };
+    const w = totalWidth - margin.left - margin.right;
+    const h = totalHeight - margin.top - margin.bottom;
+
+    const svg = d3.select('#chart-fig7')
+        .append('svg')
+        .attr('viewBox', `0 0 ${totalWidth} ${totalHeight}`)
+        .attr('preserveAspectRatio', 'xMidYMid meet')
+        .append('g')
+        .attr('transform', `translate(${margin.left},${margin.top})`);
+
+    const defs = svg.append('defs');
+
+    const regionColors = {
+        'Southern Africa': { base: '#1e88e5', light: '#42a5f5' },
+        'East Africa':     { base: '#f0c040', light: '#ffd54f' },
+        'West Africa':     { base: '#00c853', light: '#69f0ae' },
+        'North Africa':    { base: '#ff7043', light: '#ff8a65' }
+    };
+
+    Object.keys(regionColors).forEach((region, i) => {
+        const c = regionColors[region];
+        const grad = defs.append('linearGradient')
+            .attr('id', `treemap-grad-${i}`)
+            .attr('x1', '0%').attr('y1', '0%')
+            .attr('x2', '100%').attr('y2', '100%');
+        grad.append('stop').attr('offset', '0%').attr('stop-color', c.light).attr('stop-opacity', 0.35);
+        grad.append('stop').attr('offset', '100%').attr('stop-color', c.base).attr('stop-opacity', 0.55);
+    });
+
+    const flatData = [];
+    const regionIndexMap = {};
+    regionData.children.forEach((region, ri) => {
+        regionIndexMap[region.name] = ri;
+        region.children.forEach(child => {
+            flatData.push({
+                region: region.name,
+                name: child.name,
+                value: child.value,
+                pct: child.pct,
+                regionIdx: ri,
+                regionPct: region.pct,
+                regionTotal: region.value
+            });
+        });
+    });
+
+    const hierarchy = d3.hierarchy({ children: flatData })
+        .sum(d => d.value);
+
+    d3.treemap()
+        .size([w, h])
+        .padding(3)
+        .paddingOuter(4)
+        .round(true)
+        (hierarchy);
+
+    const cells = svg.selectAll('.treemap-cell')
+        .data(hierarchy.leaves())
+        .join('g')
+        .attr('class', 'treemap-cell')
+        .attr('transform', d => `translate(${d.x0},${d.y0})`);
+
+    cells.append('rect')
+        .attr('width', d => d.x1 - d.x0)
+        .attr('height', d => d.y1 - d.y0)
+        .attr('rx', 8)
+        .attr('ry', 8)
+        .attr('fill', d => `url(#treemap-grad-${d.data.regionIdx})`)
+        .attr('stroke', d => regionColors[d.data.region] ? regionColors[d.data.region].base : '#555')
+        .attr('stroke-width', 1.5)
+        .attr('stroke-opacity', 0.6)
+        .attr('opacity', 0)
+        .on('mousemove', function(event, d) {
+            d3.select(this).attr('stroke-opacity', 1).attr('stroke-width', 2.5);
+            showTooltip(event, `
+                <div class="tt-title">${d.data.name}</div>
+                <div>Region: ${d.data.region}</div>
+                <div>Allocation: <span class="tt-value">$${d.data.value.toFixed(2)}B</span> (${d.data.pct})</div>
+                <div>Region Total: $${d.data.regionTotal.toFixed(2)}B (${d.data.regionPct})</div>
+            `);
+        })
+        .on('mouseleave', function() {
+            d3.select(this).attr('stroke-opacity', 0.6).attr('stroke-width', 1.5);
+            hideTooltip();
+        })
+        .transition()
+        .duration(800)
+        .delay((d, i) => i * 120)
+        .attr('opacity', 1);
+
+    // Labels
+    cells.each(function(d) {
+        const cellW = d.x1 - d.x0;
+        const cellH = d.y1 - d.y0;
+        const g = d3.select(this);
+        const cx = cellW / 2;
+        const cy = cellH / 2;
+
+        if (cellW > 70 && cellH > 55) {
+            g.append('text')
+                .attr('class', 'treemap-label-country')
+                .attr('x', cx).attr('y', cy - 16)
+                .attr('text-anchor', 'middle')
+                .attr('font-size', cellW > 180 ? '16px' : '13px')
+                .text(d.data.name)
+                .attr('opacity', 0)
+                .transition().delay(600).duration(500).attr('opacity', 1);
+
+            g.append('text')
+                .attr('class', 'treemap-label-amount')
+                .attr('x', cx).attr('y', cy + 4)
+                .attr('text-anchor', 'middle')
+                .attr('font-size', cellW > 180 ? '14px' : '12px')
+                .text(`$${d.data.value.toFixed(d.data.value % 1 === 0 ? 1 : 2)}B`)
+                .attr('opacity', 0)
+                .transition().delay(700).duration(500).attr('opacity', 1);
+
+            g.append('text')
+                .attr('class', 'treemap-label-pct')
+                .attr('x', cx).attr('y', cy + 22)
+                .attr('text-anchor', 'middle')
+                .attr('font-size', '11px')
+                .text(d.data.pct)
+                .attr('opacity', 0)
+                .transition().delay(800).duration(500).attr('opacity', 1);
+
+            // Region label small at top
+            g.append('text')
+                .attr('x', 10).attr('y', 18)
+                .attr('fill', regionColors[d.data.region] ? regionColors[d.data.region].light : '#aaa')
+                .attr('font-size', '9px')
+                .attr('font-weight', '700')
+                .attr('letter-spacing', '1px')
+                .attr('text-transform', 'uppercase')
+                .text(d.data.region.toUpperCase())
+                .attr('opacity', 0)
+                .transition().delay(900).duration(500).attr('opacity', 0.7);
+        } else if (cellW > 50 && cellH > 35) {
+            g.append('text')
+                .attr('class', 'treemap-label-country')
+                .attr('x', cx).attr('y', cy - 4)
+                .attr('text-anchor', 'middle')
+                .attr('font-size', '11px')
+                .text(d.data.name)
+                .attr('opacity', 0)
+                .transition().delay(600).duration(500).attr('opacity', 1);
+
+            g.append('text')
+                .attr('class', 'treemap-label-amount')
+                .attr('x', cx).attr('y', cy + 12)
+                .attr('text-anchor', 'middle')
+                .attr('font-size', '10px')
+                .text(`$${d.data.value.toFixed(d.data.value % 1 === 0 ? 1 : 2)}B`)
+                .attr('opacity', 0)
+                .transition().delay(700).duration(500).attr('opacity', 1);
+        }
+    });
+
+    // Central Africa note
+    svg.append('rect')
+        .attr('x', 0)
+        .attr('y', h + 14)
+        .attr('width', w)
+        .attr('height', 28)
+        .attr('rx', 6)
+        .attr('fill', 'rgba(255, 82, 82, 0.08)')
+        .attr('stroke', 'rgba(255, 82, 82, 0.25)')
+        .attr('stroke-width', 1);
+
+    svg.append('text')
+        .attr('x', w / 2)
+        .attr('y', h + 32)
+        .attr('text-anchor', 'middle')
+        .attr('fill', '#ff8a80')
+        .attr('font-size', '12px')
+        .attr('font-weight', '500')
+        .text('Central Africa: $0B (0%) — Excluded due to insufficient infrastructure & regulatory readiness');
+
+})();
+
+// ============================================================
+// FIGURE 8: Risk vs Return Scatter
+// ============================================================
+(function() {
+    const data = [
+        { country: 'Nigeria',        risk: 5, irr: 25, investment: 1.5, tier: 1, color: '#ff5252' },
+        { country: 'Kenya',          risk: 2, irr: 20, investment: 2.0, tier: 1, color: '#f0c040' },
+        { country: 'South Africa',   risk: 2, irr: 15, investment: 3.0, tier: 1, color: '#1e88e5' },
+        { country: 'Morocco',        risk: 3, irr: 15, investment: 0.75, tier: 2, color: '#ff7043' },
+        { country: 'Egypt',          risk: 3, irr: 10, investment: 1.0, tier: 2, color: '#ff7043' },
+        { country: 'Ghana',          risk: 2, irr: 10, investment: 0.3, tier: 2, color: '#00c853' },
+        { country: "Cote d'Ivoire",  risk: 3, irr: 10, investment: 0.2, tier: 2, color: '#00c853' },
+        { country: 'Senegal',        risk: 3, irr: 5,  investment: 0.15, tier: 3, color: '#ab47bc' }
+    ];
+
+    const container = document.getElementById('chart-fig8');
+    const margin = { top: 30, right: 40, bottom: 56, left: 60 };
+    const totalW = Math.min(container.clientWidth, 1040);
+    const totalH = 480;
+    const width = totalW - margin.left - margin.right;
+    const height = totalH - margin.top - margin.bottom;
+
+    const svg = d3.select('#chart-fig8')
+        .append('svg')
+        .attr('viewBox', `0 0 ${totalW} ${totalH}`)
+        .attr('preserveAspectRatio', 'xMidYMid meet')
+        .append('g')
+        .attr('transform', `translate(${margin.left},${margin.top})`);
+
+    const defs = svg.append('defs');
+
+    data.forEach((d, i) => {
+        const grad = defs.append('radialGradient')
+            .attr('id', `bubble-grad-${i}`);
+        grad.append('stop').attr('offset', '0%').attr('stop-color', d.color).attr('stop-opacity', 0.9);
+        grad.append('stop').attr('offset', '100%').attr('stop-color', d.color).attr('stop-opacity', 0.35);
+    });
+
+    const x = d3.scaleLinear().domain([0.5, 5.8]).range([0, width]);
+    const y = d3.scaleLinear().domain([0, 30]).range([height, 0]);
+    const r = d3.scaleSqrt().domain([0, 3.0]).range([8, 42]);
+
+    // Quadrant lines
+    const qx = x(3);
+    const qy = y(12.5);
+
+    svg.append('line')
+        .attr('class', 'quadrant-line')
+        .attr('x1', qx).attr('x2', qx)
+        .attr('y1', 0).attr('y2', height);
+
+    svg.append('line')
+        .attr('class', 'quadrant-line')
+        .attr('x1', 0).attr('x2', width)
+        .attr('y1', qy).attr('y2', qy);
+
+    // Quadrant labels
+    const qlabelData = [
+        { text: 'HIGH RETURN / LOW RISK', tx: qx / 2, ty: qy / 2 - 10, sub: '(Optimal)' },
+        { text: 'HIGH RETURN / HIGH RISK', tx: qx + (width - qx) / 2, ty: qy / 2 - 10, sub: '(Speculative)' },
+        { text: 'LOW RETURN / LOW RISK',   tx: qx / 2, ty: qy + (height - qy) / 2 - 10, sub: '(Defensive)' },
+        { text: 'LOW RETURN / HIGH RISK',  tx: qx + (width - qx) / 2, ty: qy + (height - qy) / 2 - 10, sub: '(Avoid)' }
+    ];
+
+    qlabelData.forEach(ql => {
+        svg.append('text')
+            .attr('class', 'quadrant-label')
+            .attr('x', ql.tx).attr('y', ql.ty)
+            .attr('text-anchor', 'middle')
+            .text(ql.text);
+        svg.append('text')
+            .attr('class', 'quadrant-label')
+            .attr('x', ql.tx).attr('y', ql.ty + 16)
+            .attr('text-anchor', 'middle')
+            .attr('font-size', '10px')
+            .attr('font-weight', '400')
+            .attr('letter-spacing', '0.5px')
+            .text(ql.sub);
+    });
+
+    // Grid
+    svg.append('g')
+        .attr('class', 'grid')
+        .call(d3.axisBottom(x).ticks(6).tickSize(height).tickFormat(''))
+        .attr('transform', `translate(0,0)`);
+
+    svg.append('g')
+        .attr('class', 'grid')
+        .call(d3.axisLeft(y).ticks(7).tickSize(-width).tickFormat(''));
+
+    // Axes
+    svg.append('g')
+        .attr('class', 'axis')
+        .attr('transform', `translate(0,${height})`)
+        .call(d3.axisBottom(x).ticks(6).tickFormat(d => d));
+
+    svg.append('text')
+        .attr('class', 'axis-label')
+        .attr('x', width / 2).attr('y', height + 42)
+        .attr('text-anchor', 'middle')
+        .text('Risk Level (1 = Low, 5 = High)');
+
+    svg.append('g')
+        .attr('class', 'axis')
+        .call(d3.axisLeft(y).ticks(7).tickFormat(d => d + '%'));
+
+    svg.append('text')
+        .attr('class', 'axis-label')
+        .attr('transform', 'rotate(-90)')
+        .attr('x', -height / 2).attr('y', -44)
+        .attr('text-anchor', 'middle')
+        .text('Expected IRR (%)');
+
+    // Bubbles
+    const bubbles = svg.selectAll('.bubble')
+        .data(data)
+        .join('g')
+        .attr('class', 'bubble')
+        .attr('transform', d => `translate(${x(d.risk)},${y(d.irr)})`);
+
+    bubbles.append('circle')
+        .attr('r', 0)
+        .attr('fill', (d, i) => `url(#bubble-grad-${i})`)
+        .attr('stroke', d => d.color)
+        .attr('stroke-width', 1.5)
+        .attr('stroke-opacity', 0.7)
+        .attr('cursor', 'pointer')
+        .on('mousemove', function(event, d) {
+            d3.select(this).attr('stroke-width', 3).attr('stroke-opacity', 1);
+            const tierLabel = d.tier === 1 ? 'Tier 1 (Anchor)' : d.tier === 2 ? 'Tier 2 (Secondary)' : 'Tier 3 (Exploratory)';
+            showTooltip(event, `
+                <div class="tt-title">${d.country}</div>
+                <div>Expected IRR: <span class="tt-value">${d.irr}%</span></div>
+                <div>Risk Level: <span class="tt-value">${d.risk}/5</span></div>
+                <div>Investment: <span class="tt-value">$${d.investment.toFixed(2)}B</span></div>
+                <div style="margin-top:3px;color:#8899aa">${tierLabel}</div>
+            `);
+        })
+        .on('mouseleave', function() {
+            d3.select(this).attr('stroke-width', 1.5).attr('stroke-opacity', 0.7);
+            hideTooltip();
+        })
+        .transition()
+        .duration(700)
+        .delay((d, i) => 200 + i * 100)
+        .ease(d3.easeBackOut.overshoot(1.1))
+        .attr('r', d => r(d.investment));
+
+    // Country labels
+    bubbles.append('text')
+        .attr('dy', d => -r(d.investment) - 8)
+        .attr('text-anchor', 'middle')
+        .attr('fill', '#ffffff')
+        .attr('font-size', '11px')
+        .attr('font-weight', '600')
+        .text(d => d.country)
+        .attr('opacity', 0)
+        .transition()
+        .delay((d, i) => 700 + i * 100)
+        .duration(500)
+        .attr('opacity', 1);
+
+    // Investment amount inside large bubbles
+    bubbles.filter(d => d.investment >= 0.75)
+        .append('text')
+        .attr('dy', '0.35em')
+        .attr('text-anchor', 'middle')
+        .attr('fill', '#ffffff')
+        .attr('font-size', '10px')
+        .attr('font-weight', '700')
+        .text(d => `$${d.investment}B`)
+        .attr('opacity', 0)
+        .transition()
+        .delay(1000)
+        .duration(500)
+        .attr('opacity', 0.9);
+
+    // Legend
+    const legendData = [
+        { label: 'Tier 1 (Anchor)', colors: ['#1e88e5', '#f0c040', '#ff5252'] },
+        { label: 'Tier 2 (Secondary)', colors: ['#ff7043', '#00c853'] },
+        { label: 'Tier 3 (Exploratory)', colors: ['#ab47bc'] }
+    ];
+
+    const legend = svg.append('g')
+        .attr('transform', `translate(${width - 160}, 10)`);
+
+    legend.append('rect')
+        .attr('x', -10).attr('y', -8)
+        .attr('width', 175).attr('height', 74)
+        .attr('rx', 6)
+        .attr('fill', 'rgba(10,10,25,0.6)')
+        .attr('stroke', 'rgba(255,255,255,0.08)')
+        .attr('stroke-width', 1);
+
+    legend.append('text')
+        .attr('x', 0).attr('y', 8)
+        .attr('fill', '#8899aa')
+        .attr('font-size', '9px')
+        .attr('font-weight', '700')
+        .attr('letter-spacing', '1.5px')
+        .text('INVESTMENT TIERS');
+
+    legendData.forEach((tier, i) => {
+        const g = legend.append('g').attr('transform', `translate(0, ${22 + i * 18})`);
+        tier.colors.forEach((c, ci) => {
+            g.append('circle')
+                .attr('cx', ci * 14)
+                .attr('cy', 0)
+                .attr('r', 5)
+                .attr('fill', c)
+                .attr('opacity', 0.8);
+        });
+        g.append('text')
+            .attr('x', tier.colors.length * 14 + 4)
+            .attr('dy', '0.35em')
+            .attr('fill', '#8899aa')
+            .attr('font-size', '10px')
+            .text(tier.label);
+    });
+
+})();
+
+// ============================================================
+// FIGURE 9: Power Reliability
+// ============================================================
+(function() {
+    const data = [
+        { country: 'Egypt',          score: 8.0, eri: null },
+        { country: 'Morocco',        score: 8.0, eri: null },
+        { country: 'South Africa',   score: 7.0, eri: null },
+        { country: 'Senegal',        score: 7.0, eri: 0.892 },
+        { country: 'Kenya',          score: 7.0, eri: 0.889 },
+        { country: "Cote d'Ivoire",  score: 6.0, eri: null },
+        { country: 'Ghana',          score: 6.0, eri: null },
+        { country: 'Nigeria',        score: 5.0, eri: null }
+    ];
+
+    data.sort((a, b) => b.score - a.score || a.country.localeCompare(b.country));
+
+    function trafficColor(score) {
+        if (score >= 8) return { color: '#00c853', label: 'GREEN' };
+        if (score >= 6) return { color: '#f0c040', label: 'AMBER' };
+        return { color: '#ff5252', label: 'RED' };
+    }
+
+    const container = document.getElementById('chart-fig9');
+    const margin = { top: 20, right: 120, bottom: 40, left: 120 };
+    const totalW = Math.min(container.clientWidth, 1040);
+    const barHeight = 44;
+    const height = data.length * barHeight;
+    const width = totalW - margin.left - margin.right;
+
+    const svg = d3.select('#chart-fig9')
+        .append('svg')
+        .attr('viewBox', `0 0 ${totalW} ${height + margin.top + margin.bottom}`)
+        .attr('preserveAspectRatio', 'xMidYMid meet')
+        .append('g')
+        .attr('transform', `translate(${margin.left},${margin.top})`);
+
+    const defs = svg.append('defs');
+
+    data.forEach((d, i) => {
+        const tc = trafficColor(d.score);
+        const grad = defs.append('linearGradient')
+            .attr('id', `power-grad-${i}`)
+            .attr('x1', '0%').attr('x2', '100%');
+        grad.append('stop').attr('offset', '0%').attr('stop-color', tc.color).attr('stop-opacity', 0.4);
+        grad.append('stop').attr('offset', '100%').attr('stop-color', tc.color).attr('stop-opacity', 0.85);
+    });
+
+    const x = d3.scaleLinear().domain([0, 10]).range([0, width]);
+    const y = d3.scaleBand().domain(data.map(d => d.country)).range([0, height]).padding(0.3);
+
+    // Grid
+    svg.append('g')
+        .attr('class', 'grid')
+        .call(d3.axisBottom(x).ticks(10).tickSize(height).tickFormat(''))
+        .attr('transform', `translate(0,0)`);
+
+    // X axis
+    svg.append('g')
+        .attr('class', 'axis')
+        .attr('transform', `translate(0,${height})`)
+        .call(d3.axisBottom(x).ticks(10).tickFormat(d => d));
+
+    svg.append('text')
+        .attr('class', 'axis-label')
+        .attr('x', width / 2).attr('y', height + 36)
+        .attr('text-anchor', 'middle')
+        .text('Grid Reliability Score (1-10)');
+
+    // Y axis
+    svg.append('g')
+        .attr('class', 'axis')
+        .call(d3.axisLeft(y).tickSize(0))
+        .select('.domain').remove();
+
+    // Traffic light indicator circles
+    svg.selectAll('.traffic-dot')
+        .data(data)
+        .join('circle')
+        .attr('cx', -14)
+        .attr('cy', d => y(d.country) + y.bandwidth() / 2)
+        .attr('r', 5)
+        .attr('fill', d => trafficColor(d.score).color)
+        .attr('opacity', 0)
+        .transition()
+        .delay((d, i) => 300 + i * 60)
+        .duration(400)
+        .attr('opacity', 1);
+
+    // Bars
+    svg.selectAll('.bar')
+        .data(data)
+        .join('rect')
+        .attr('x', 0)
+        .attr('y', d => y(d.country))
+        .attr('height', y.bandwidth())
+        .attr('rx', 4)
+        .attr('ry', 4)
+        .attr('fill', (d, i) => `url(#power-grad-${i})`)
+        .attr('stroke', d => trafficColor(d.score).color)
+        .attr('stroke-width', 1)
+        .attr('stroke-opacity', 0.3)
+        .attr('width', 0)
+        .on('mousemove', function(event, d) {
+            const tc = trafficColor(d.score);
+            d3.select(this).attr('stroke-opacity', 0.8).attr('stroke-width', 2);
+            let html = `
+                <div class="tt-title">${d.country}</div>
+                <div>Grid Reliability: <span class="tt-value">${d.score.toFixed(1)} / 10</span></div>
+                <div>Status: <span style="color:${tc.color};font-weight:600">${tc.label}</span></div>
+            `;
+            if (d.eri) {
+                html += `<div style="margin-top:3px">ERI Score: <span class="tt-value">${d.eri.toFixed(3)}</span></div>`;
+            }
+            if (d.country === 'Nigeria') {
+                html += `<div style="margin-top:3px;color:#ff8a80">Requires 3-4x backup power investment</div>`;
+            }
+            showTooltip(event, html);
+        })
+        .on('mouseleave', function() {
+            d3.select(this).attr('stroke-opacity', 0.3).attr('stroke-width', 1);
+            hideTooltip();
+        })
+        .transition()
+        .duration(900)
+        .delay((d, i) => i * 80)
+        .ease(d3.easeCubicOut)
+        .attr('width', d => x(d.score));
+
+    // Value labels
+    svg.selectAll('.val-label')
+        .data(data)
+        .join('text')
+        .attr('x', d => x(d.score) + 8)
+        .attr('y', d => y(d.country) + y.bandwidth() / 2)
+        .attr('dy', '0.35em')
+        .attr('fill', d => trafficColor(d.score).color)
+        .attr('font-size', '13px')
+        .attr('font-weight', '700')
+        .attr('opacity', 0)
+        .text(d => d.score.toFixed(1))
+        .transition()
+        .duration(500)
+        .delay((d, i) => 500 + i * 80)
+        .attr('opacity', 1);
+
+    // ERI annotations
+    data.filter(d => d.eri).forEach(d => {
+        const yPos = y(d.country) + y.bandwidth() / 2;
+        svg.append('text')
+            .attr('x', x(d.score) + 38)
+            .attr('y', yPos)
+            .attr('dy', '0.35em')
+            .attr('fill', '#0096ff')
+            .attr('font-size', '10px')
+            .attr('font-weight', '600')
+            .attr('opacity', 0)
+            .text(`ERI: ${d.eri}`)
+            .transition()
+            .delay(1200)
+            .duration(500)
+            .attr('opacity', 0.9);
+
+        if (d.country === 'Senegal') {
+            svg.append('text')
+                .attr('x', x(d.score) + 38)
+                .attr('y', yPos + 13)
+                .attr('fill', '#0096ff')
+                .attr('font-size', '9px')
+                .attr('font-weight', '500')
+                .attr('opacity', 0)
+                .text('(#1 in Africa)')
+                .transition()
+                .delay(1300)
+                .duration(500)
+                .attr('opacity', 0.7);
+        }
+        if (d.country === 'Kenya') {
+            svg.append('text')
+                .attr('x', x(d.score) + 38)
+                .attr('y', yPos + 13)
+                .attr('fill', '#0096ff')
+                .attr('font-size', '9px')
+                .attr('font-weight', '500')
+                .attr('opacity', 0)
+                .text('(#2 in Africa)')
+                .transition()
+                .delay(1300)
+                .duration(500)
+                .attr('opacity', 0.7);
+        }
+    });
+
+    // Nigeria annotation
+    const nigeriaY = y('Nigeria') + y.bandwidth() / 2;
+    svg.append('text')
+        .attr('x', x(5.0) + 38)
+        .attr('y', nigeriaY)
+        .attr('dy', '0.35em')
+        .attr('fill', '#ff5252')
+        .attr('font-size', '10px')
+        .attr('font-weight', '600')
+        .attr('opacity', 0)
+        .text('3-4x backup power')
+        .transition()
+        .delay(1200)
+        .duration(500)
+        .attr('opacity', 0.9);
+
+    svg.append('text')
+        .attr('x', x(5.0) + 38)
+        .attr('y', nigeriaY + 13)
+        .attr('fill', '#ff5252')
+        .attr('font-size', '9px')
+        .attr('font-weight', '500')
+        .attr('opacity', 0)
+        .text('investment required')
+        .transition()
+        .delay(1300)
+        .duration(500)
+        .attr('opacity', 0.7);
+
+    // Legend
+    const legendG = svg.append('g')
+        .attr('transform', `translate(${width - 160}, -10)`);
+
+    legendG.append('rect')
+        .attr('x', -10).attr('y', -6)
+        .attr('width', 170).attr('height', 68)
+        .attr('rx', 6)
+        .attr('fill', 'rgba(10,10,25,0.6)')
+        .attr('stroke', 'rgba(255,255,255,0.08)')
+        .attr('stroke-width', 1);
+
+    const legendItems = [
+        { label: 'Green (Score >= 8)', color: '#00c853' },
+        { label: 'Amber (Score 6-7)', color: '#f0c040' },
+        { label: 'Red (Score <= 5)', color: '#ff5252' }
+    ];
+
+    legendItems.forEach((item, i) => {
+        const g = legendG.append('g').attr('transform', `translate(0, ${6 + i * 18})`);
+        g.append('circle')
+            .attr('cx', 4).attr('cy', 0)
+            .attr('r', 5)
+            .attr('fill', item.color);
+        g.append('text')
+            .attr('x', 16).attr('dy', '0.35em')
+            .attr('fill', '#8899aa')
+            .attr('font-size', '10.5px')
+            .text(item.label);
+    });
+
+})();
+
+// Trigger entrance animation
+setTimeout(() => {
+    document.querySelectorAll('.chart-card').forEach((card, i) => {
+        setTimeout(() => card.classList.add('visible'), i * 200);
+    });
+}, 150);
+</script>
+</body>
+</html>

@@ -1,0 +1,1589 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Africa AI Data Center Analysis — Part 3: Regulatory, Connectivity &amp; Summary</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <style>
+        /* ── Reset & Base ─────────────────────────────────────── */
+        *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+        :root {
+            --bg-primary: #1a1a2e;
+            --bg-secondary: #16213e;
+            --bg-card: #1e2a4a;
+            --bg-card-hover: #243154;
+            --accent-gold: #f5c542;
+            --accent-gold-dim: #c49a2a;
+            --accent-blue: #4fc3f7;
+            --accent-cyan: #26c6da;
+            --accent-teal: #00bfa5;
+            --accent-green: #66bb6a;
+            --accent-orange: #ffa726;
+            --accent-red: #ef5350;
+            --accent-purple: #ab47bc;
+            --accent-pink: #ec407a;
+            --text-primary: #ffffff;
+            --text-secondary: #b0bec5;
+            --text-muted: #78909c;
+            --border-subtle: rgba(255,255,255,0.08);
+            --shadow-card: 0 8px 32px rgba(0,0,0,0.35);
+            --shadow-card-hover: 0 12px 48px rgba(0,0,0,0.45);
+            --gradient-header: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            --gradient-gold: linear-gradient(135deg, #f5c542, #e6a817);
+            --gradient-blue: linear-gradient(135deg, #4fc3f7, #0288d1);
+            --gradient-insight: linear-gradient(135deg, rgba(79,195,247,0.12), rgba(38,198,218,0.08));
+            --radius: 12px;
+            --radius-sm: 8px;
+            --transition: 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        body {
+            font-family: 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            line-height: 1.6;
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* ── Scrollbar ────────────────────────────────────────── */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: var(--bg-primary); }
+        ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+
+        /* ── Header ───────────────────────────────────────────── */
+        .header {
+            background: var(--gradient-header);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 48px 24px 40px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .header::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background:
+                radial-gradient(ellipse 600px 300px at 20% 50%, rgba(79,195,247,0.06), transparent),
+                radial-gradient(ellipse 600px 300px at 80% 50%, rgba(245,197,66,0.06), transparent);
+            pointer-events: none;
+        }
+        .header-badge {
+            display: inline-block;
+            background: rgba(245,197,66,0.15);
+            color: var(--accent-gold);
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            padding: 6px 18px;
+            border-radius: 20px;
+            border: 1px solid rgba(245,197,66,0.25);
+            margin-bottom: 20px;
+        }
+        .header h1 {
+            font-size: clamp(24px, 4vw, 38px);
+            font-weight: 700;
+            letter-spacing: -0.5px;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #ffffff, #b0bec5);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+        .header .subtitle {
+            font-size: clamp(13px, 2vw, 16px);
+            color: var(--text-secondary);
+            font-weight: 400;
+        }
+        .header .subtitle strong {
+            color: var(--accent-gold);
+            font-weight: 600;
+        }
+
+        /* ── Navigation ───────────────────────────────────────── */
+        .nav-links {
+            display: flex;
+            justify-content: center;
+            gap: 16px;
+            margin-top: 24px;
+            flex-wrap: wrap;
+        }
+        .nav-links a {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 20px;
+            border-radius: 24px;
+            font-size: 13px;
+            font-weight: 600;
+            text-decoration: none;
+            transition: var(--transition);
+            border: 1px solid var(--border-subtle);
+        }
+        .nav-links a.nav-other {
+            color: var(--text-secondary);
+            background: rgba(255,255,255,0.04);
+        }
+        .nav-links a.nav-other:hover {
+            color: var(--accent-blue);
+            background: rgba(79,195,247,0.1);
+            border-color: rgba(79,195,247,0.3);
+        }
+        .nav-links a.nav-current {
+            color: var(--accent-gold);
+            background: rgba(245,197,66,0.12);
+            border-color: rgba(245,197,66,0.3);
+            cursor: default;
+        }
+        .nav-arrow { font-size: 11px; }
+
+        /* ── Main Container ───────────────────────────────────── */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 24px 80px;
+        }
+
+        /* ── Section Headers ──────────────────────────────────── */
+        .section-header {
+            margin-bottom: 32px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .section-header h2 {
+            font-size: 22px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        .section-header p {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
+        /* ── Card ─────────────────────────────────────────────── */
+        .card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius);
+            padding: 32px;
+            margin-bottom: 40px;
+            box-shadow: var(--shadow-card);
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+        }
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0;
+            height: 3px;
+            background: var(--gradient-blue);
+            opacity: 0;
+            transition: var(--transition);
+        }
+        .card:hover {
+            box-shadow: var(--shadow-card-hover);
+            border-color: rgba(255,255,255,0.12);
+        }
+        .card:hover::before {
+            opacity: 1;
+        }
+        .card-title {
+            font-size: 18px;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 4px;
+        }
+        .card-subtitle {
+            font-size: 13px;
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+        .card-figure-label {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--accent-blue);
+            margin-bottom: 8px;
+        }
+
+        /* ── Chart Container ──────────────────────────────────── */
+        .chart-container {
+            width: 100%;
+            overflow-x: auto;
+        }
+        .chart-container svg {
+            display: block;
+            margin: 0 auto;
+        }
+
+        /* ── Insight Box ──────────────────────────────────────── */
+        .insight-box {
+            margin-top: 24px;
+            padding: 16px 20px;
+            background: var(--gradient-insight);
+            border-left: 3px solid var(--accent-blue);
+            border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.7;
+        }
+        .insight-box strong {
+            color: var(--accent-blue);
+        }
+        .insight-box .insight-label {
+            display: inline-block;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            text-transform: uppercase;
+            color: var(--accent-blue);
+            margin-bottom: 4px;
+        }
+
+        /* ── Tooltip ──────────────────────────────────────────── */
+        .tooltip {
+            position: fixed;
+            pointer-events: none;
+            background: rgba(22, 33, 62, 0.96);
+            border: 1px solid rgba(79,195,247,0.3);
+            border-radius: var(--radius-sm);
+            padding: 12px 16px;
+            font-size: 13px;
+            color: var(--text-primary);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.2s ease;
+            max-width: 280px;
+            line-height: 1.5;
+            backdrop-filter: blur(12px);
+        }
+        .tooltip.active { opacity: 1; }
+        .tooltip .tt-title {
+            font-weight: 700;
+            color: var(--accent-gold);
+            margin-bottom: 4px;
+        }
+        .tooltip .tt-value {
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+
+        /* ── Summary Dashboard ────────────────────────────────── */
+        .summary-section {
+            margin-top: 48px;
+        }
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+        .summary-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius);
+            padding: 28px;
+            box-shadow: var(--shadow-card);
+            transition: var(--transition);
+        }
+        .summary-card:hover {
+            box-shadow: var(--shadow-card-hover);
+            border-color: rgba(255,255,255,0.12);
+        }
+        .summary-card-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--accent-gold);
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .summary-card-title .icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+        .tier-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            margin-right: 6px;
+        }
+        .tier-1 { background: rgba(245,197,66,0.2); color: var(--accent-gold); }
+        .tier-2 { background: rgba(79,195,247,0.2); color: var(--accent-blue); }
+        .tier-3 { background: rgba(176,190,197,0.15); color: var(--text-secondary); }
+
+        .tier-row {
+            display: flex;
+            align-items: center;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .tier-row:last-child { border-bottom: none; }
+        .tier-countries {
+            font-size: 14px;
+            color: var(--text-primary);
+            margin-left: 8px;
+        }
+        .tier-years {
+            font-size: 12px;
+            color: var(--text-muted);
+            margin-left: auto;
+            white-space: nowrap;
+        }
+
+        .phase-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid var(--border-subtle);
+        }
+        .phase-row:last-child { border-bottom: none; }
+        .phase-label {
+            font-size: 14px;
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+        .phase-detail {
+            font-size: 12px;
+            color: var(--text-muted);
+        }
+        .phase-amount {
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--accent-gold);
+            white-space: nowrap;
+        }
+
+        .csf-row {
+            display: flex;
+            align-items: flex-start;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border-subtle);
+            gap: 12px;
+        }
+        .csf-row:last-child { border-bottom: none; }
+        .csf-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+        .csf-content {
+            flex: 1;
+        }
+        .csf-title {
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 2px;
+        }
+        .csf-detail {
+            font-size: 12px;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* ── Footer ───────────────────────────────────────────── */
+        .footer {
+            text-align: center;
+            padding: 40px 24px;
+            border-top: 1px solid var(--border-subtle);
+            color: var(--text-muted);
+            font-size: 12px;
+        }
+        .footer a {
+            color: var(--accent-blue);
+            text-decoration: none;
+        }
+
+        /* ── Animations ───────────────────────────────────────── */
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(24px); }
+            to   { opacity: 1; transform: translateY(0); }
+        }
+        .animate-in {
+            opacity: 0;
+            animation: fadeInUp 0.7s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+        }
+        .delay-1 { animation-delay: 0.1s; }
+        .delay-2 { animation-delay: 0.2s; }
+        .delay-3 { animation-delay: 0.3s; }
+        .delay-4 { animation-delay: 0.4s; }
+        .delay-5 { animation-delay: 0.5s; }
+
+        /* ── D3 Axes ──────────────────────────────────────────── */
+        .axis path, .axis line {
+            stroke: rgba(255,255,255,0.15);
+        }
+        .axis text {
+            fill: var(--text-secondary);
+            font-size: 12px;
+        }
+        .grid line {
+            stroke: rgba(255,255,255,0.06);
+        }
+        .grid path {
+            stroke: none;
+        }
+
+        /* ── Annotation ───────────────────────────────────────── */
+        .annotation-box {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            background: rgba(245,197,66,0.1);
+            border: 1px solid rgba(245,197,66,0.25);
+            border-radius: 6px;
+            font-size: 12px;
+            color: var(--accent-gold);
+            margin-top: 12px;
+        }
+        .annotation-box .ann-icon {
+            font-size: 14px;
+        }
+
+        /* ── Responsive ───────────────────────────────────────── */
+        @media (max-width: 768px) {
+            .header { padding: 32px 16px 28px; }
+            .container { padding: 24px 16px 60px; }
+            .card { padding: 20px; }
+            .summary-grid { grid-template-columns: 1fr; }
+        }
+
+        /* ── Legend ────────────────────────────────────────────── */
+        .chart-legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-top: 16px;
+            justify-content: center;
+        }
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        .legend-swatch {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
+        }
+
+        /* Quadrant labels */
+        .quadrant-label {
+            font-size: 11px;
+            fill: rgba(255,255,255,0.25);
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+
+<!-- ── Tooltip ──────────────────────────────────────────────── -->
+<div class="tooltip" id="tooltip"></div>
+
+<!-- ── Header ──────────────────────────────────────────────── -->
+<header class="header">
+    <div class="header-badge">Part 3 of 3</div>
+    <h1>Africa AI Data Center Analysis</h1>
+    <p class="subtitle">Part 3: Regulatory, Connectivity &amp; Summary &mdash; <strong>AfDB $10B AI Infrastructure Fund</strong> | 9 February 2026</p>
+    <nav class="nav-links">
+        <a href="part1-market-landscape.html" class="nav-other">
+            <span class="nav-arrow">&larr;</span> Part 1: Market Landscape
+        </a>
+        <a href="part2-infrastructure-investment.html" class="nav-other">
+            <span class="nav-arrow">&larr;</span> Part 2: Infrastructure &amp; Investment
+        </a>
+        <a href="part3-regulatory-summary.html" class="nav-current">
+            Part 3: Regulatory &amp; Summary
+        </a>
+    </nav>
+</header>
+
+<!-- ── Main Container ──────────────────────────────────────── -->
+<div class="container">
+
+    <!-- ═══════════════════════════════════════════════════════
+         FIGURE 10 — Regulatory Excellence Ranking
+         ═══════════════════════════════════════════════════════ -->
+    <div class="card animate-in delay-1" id="card-fig10">
+        <div class="card-figure-label">Figure 10</div>
+        <div class="card-title">Regulatory Excellence Ranking</div>
+        <div class="card-subtitle">AfDB Environmental Regulatory Index (ERI) 2024 &mdash; Top African Countries</div>
+        <div class="chart-container" id="chart-fig10"></div>
+        <div class="annotation-box">
+            <span class="ann-icon">&#9432;</span>
+            Only Kenya and Senegal from our priority markets appear in the top 10
+        </div>
+        <div class="insight-box">
+            <span class="insight-label">Key Insight</span><br>
+            <strong>Senegal (#1) and Kenya (#2)</strong> lead Africa in regulatory excellence, providing a strong enabling environment for data center investment. Their high ERI scores indicate predictable, transparent regulatory frameworks critical for large-scale infrastructure deployment.
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════
+         FIGURE 11 — Market Size vs. Readiness Matrix
+         ═══════════════════════════════════════════════════════ -->
+    <div class="card animate-in delay-2" id="card-fig11">
+        <div class="card-figure-label">Figure 11</div>
+        <div class="card-title">Market Size vs. Readiness Matrix</div>
+        <div class="card-subtitle">Infrastructure Readiness Score vs. Digital Demand Index &mdash; Priority Markets</div>
+        <div class="chart-container" id="chart-fig11"></div>
+        <div class="chart-legend" id="legend-fig11"></div>
+        <div class="insight-box">
+            <span class="insight-label">Key Insight</span><br>
+            <strong>South Africa, Kenya, and Nigeria</strong> occupy the "Prime Investment" quadrant with both high readiness and high demand. Egypt is a strong contender approaching the top quadrant. Morocco, Ghana, and C&ocirc;te d'Ivoire present opportunities for phased entry as readiness matures.
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════
+         FIGURE 12 — AfDB Fund Allocation Timeline
+         ═══════════════════════════════════════════════════════ -->
+    <div class="card animate-in delay-3" id="card-fig12">
+        <div class="card-figure-label">Figure 12</div>
+        <div class="card-title">AfDB Fund Allocation Timeline</div>
+        <div class="card-subtitle">$10B AI Infrastructure Fund &mdash; Phased Deployment Strategy (2026&ndash;2030+)</div>
+        <div class="chart-container" id="chart-fig12"></div>
+        <div class="chart-legend" id="legend-fig12"></div>
+        <div class="insight-box">
+            <span class="insight-label">Key Insight</span><br>
+            <strong>65% of capital ($6.5B) deploys in Phase 1</strong> to the three most market-ready economies. Phase 2 expands to emerging markets, while a $1.25B reserve ensures systemic support for skills, R&amp;D, and regulatory capacity building throughout.
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════
+         FIGURE 13 — Broadband Speed Leaders
+         ═══════════════════════════════════════════════════════ -->
+    <div class="card animate-in delay-4" id="card-fig13">
+        <div class="card-figure-label">Figure 13</div>
+        <div class="card-title">Broadband Speed Leaders</div>
+        <div class="card-subtitle">Average Fixed Broadband Speed (Mbps) &mdash; Africa Top Rankings + Priority Markets</div>
+        <div class="chart-container" id="chart-fig13"></div>
+        <div class="insight-box">
+            <span class="insight-label">Key Insight</span><br>
+            <strong>Egypt's connectivity advantage (84.52 Mbps)</strong> supports its role as a regional hub and North Africa gateway. C&ocirc;te d'Ivoire's strong second-place showing among African nations bolsters its West Africa positioning. Nigeria's lower speeds (22.0 Mbps) represent a key infrastructure gap requiring investment.
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════
+         SUMMARY DASHBOARD
+         ═══════════════════════════════════════════════════════ -->
+    <div class="summary-section animate-in delay-5">
+        <div class="section-header">
+            <h2>Strategic Investment Summary</h2>
+            <p>Consolidated recommendations for the AfDB $10B AI Infrastructure Fund</p>
+        </div>
+
+        <div class="summary-grid">
+
+            <!-- Market Readiness Hierarchy -->
+            <div class="summary-card">
+                <div class="summary-card-title">
+                    <span class="icon" style="background:rgba(245,197,66,0.15);">&#9733;</span>
+                    Market Readiness Hierarchy
+                </div>
+                <div class="tier-row">
+                    <span class="tier-badge tier-1">Tier 1</span>
+                    <span class="tier-countries">South Africa, Kenya, Nigeria</span>
+                    <span class="tier-years">Ready 2026&ndash;2028</span>
+                </div>
+                <div class="tier-row">
+                    <span class="tier-badge tier-2">Tier 2</span>
+                    <span class="tier-countries">Egypt, Morocco, Ghana</span>
+                    <span class="tier-years">Ready 2028&ndash;2030</span>
+                </div>
+                <div class="tier-row">
+                    <span class="tier-badge tier-3">Tier 3</span>
+                    <span class="tier-countries">Senegal, C&ocirc;te d'Ivoire, Rwanda</span>
+                    <span class="tier-years">Ready 2030+</span>
+                </div>
+            </div>
+
+            <!-- Investment Priorities -->
+            <div class="summary-card">
+                <div class="summary-card-title">
+                    <span class="icon" style="background:rgba(79,195,247,0.15);">&#9830;</span>
+                    Investment Priorities
+                </div>
+                <div class="phase-row">
+                    <div>
+                        <div class="phase-label">Phase 1 (2026&ndash;2028)</div>
+                        <div class="phase-detail">South Africa, Kenya, Nigeria</div>
+                    </div>
+                    <div class="phase-amount">$6.50B</div>
+                </div>
+                <div class="phase-row">
+                    <div>
+                        <div class="phase-label">Phase 2 (2029&ndash;2030)</div>
+                        <div class="phase-detail">Egypt, Morocco, Ghana/CI</div>
+                    </div>
+                    <div class="phase-amount">$2.25B</div>
+                </div>
+                <div class="phase-row">
+                    <div>
+                        <div class="phase-label">Reserve (Throughout)</div>
+                        <div class="phase-detail">Skills, R&amp;D, Regulatory</div>
+                    </div>
+                    <div class="phase-amount">$1.25B</div>
+                </div>
+            </div>
+
+            <!-- Critical Success Factors — spans full width -->
+        </div>
+
+        <div class="summary-card" style="margin-bottom: 0;">
+            <div class="summary-card-title">
+                <span class="icon" style="background:rgba(0,191,165,0.15);">&#10004;</span>
+                Critical Success Factors
+            </div>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 32px;">
+                <div>
+                    <div class="csf-row">
+                        <div class="csf-icon" style="background:rgba(239,83,80,0.15); color:#ef5350;">&#9889;</div>
+                        <div class="csf-content">
+                            <div class="csf-title">1. Power Reliability</div>
+                            <div class="csf-detail">#1 challenge across the continent. Nigeria rates only 5/10 &mdash; renewable energy co-investment essential.</div>
+                        </div>
+                    </div>
+                    <div class="csf-row">
+                        <div class="csf-icon" style="background:rgba(38,198,218,0.15); color:#26c6da;">&#10052;</div>
+                        <div class="csf-content">
+                            <div class="csf-title">2. Cooling Efficiency</div>
+                            <div class="csf-detail">Kenya offers ~30% cooling cost advantage due to high-altitude climate. Critical for TCO optimization.</div>
+                        </div>
+                    </div>
+                    <div class="csf-row">
+                        <div class="csf-icon" style="background:rgba(245,197,66,0.15); color:#f5c542;">&#9878;</div>
+                        <div class="csf-content">
+                            <div class="csf-title">3. Regulatory Excellence</div>
+                            <div class="csf-detail">Senegal (#1, ERI 0.892) and Kenya (#2, ERI 0.889) lead Africa. Predictable frameworks reduce investor risk.</div>
+                        </div>
+                    </div>
+                </div>
+                <div>
+                    <div class="csf-row">
+                        <div class="csf-icon" style="background:rgba(79,195,247,0.15); color:#4fc3f7;">&#127760;</div>
+                        <div class="csf-content">
+                            <div class="csf-title">4. Connectivity</div>
+                            <div class="csf-detail">Egypt (#1, 84.52 Mbps) and C&ocirc;te d'Ivoire (#2, 59.93 Mbps) have fastest broadband. Nigeria needs urgent upgrade.</div>
+                        </div>
+                    </div>
+                    <div class="csf-row">
+                        <div class="csf-icon" style="background:rgba(171,71,188,0.15); color:#ab47bc;">&#128202;</div>
+                        <div class="csf-content">
+                            <div class="csf-title">5. Digital Demand</div>
+                            <div class="csf-detail">Nigeria (10/10), South Africa (9/10), and Kenya (9/10) are the continent's highest-demand digital markets.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div><!-- /summary-section -->
+
+</div><!-- /container -->
+
+<!-- ── Footer ──────────────────────────────────────────────── -->
+<footer class="footer">
+    <p>Africa AI Data Center Analysis &mdash; Part 3 of 3 &mdash; Prepared for AfDB $10B AI Infrastructure Fund Decision Making</p>
+    <p style="margin-top:6px;">9 February 2026 &nbsp;|&nbsp; Visualization powered by <a href="https://d3js.org" target="_blank" rel="noopener">D3.js v7</a></p>
+</footer>
+
+<!-- ══════════════════════════════════════════════════════════
+     D3.js Visualization Scripts
+     ══════════════════════════════════════════════════════════ -->
+<script>
+(function() {
+    "use strict";
+
+    // ── Shared Helpers ──────────────────────────────────────
+    const tooltip = d3.select("#tooltip");
+
+    function showTooltip(event, html) {
+        tooltip.classed("active", true).html(html);
+        const ttNode = tooltip.node();
+        const ttRect = ttNode.getBoundingClientRect();
+        let tx = event.clientX + 14;
+        let ty = event.clientY - 10;
+        if (tx + ttRect.width > window.innerWidth - 12) tx = event.clientX - ttRect.width - 14;
+        if (ty + ttRect.height > window.innerHeight - 12) ty = event.clientY - ttRect.height - 10;
+        if (ty < 12) ty = 12;
+        tooltip.style("left", tx + "px").style("top", ty + "px");
+    }
+    function moveTooltip(event) {
+        const ttNode = tooltip.node();
+        const ttRect = ttNode.getBoundingClientRect();
+        let tx = event.clientX + 14;
+        let ty = event.clientY - 10;
+        if (tx + ttRect.width > window.innerWidth - 12) tx = event.clientX - ttRect.width - 14;
+        if (ty + ttRect.height > window.innerHeight - 12) ty = event.clientY - ttRect.height - 10;
+        if (ty < 12) ty = 12;
+        tooltip.style("left", tx + "px").style("top", ty + "px");
+    }
+    function hideTooltip() {
+        tooltip.classed("active", false);
+    }
+
+    const priorityMarkets = ["South Africa", "Kenya", "Nigeria", "Egypt", "Morocco", "Ghana", "Cote d'Ivoire", "Senegal"];
+    const accentGold = "#f5c542";
+    const accentBlue = "#4fc3f7";
+    const mutedBar = "#546e7a";
+    const tierColors = { 1: "#f5c542", 2: "#4fc3f7", 3: "#78909c" };
+
+    // ── Intersection Observer for Animations ────────────────
+    const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add("animate-in");
+            }
+        });
+    }, { threshold: 0.1 });
+
+    document.querySelectorAll(".card, .summary-section").forEach(el => observer.observe(el));
+
+
+    // ══════════════════════════════════════════════════════════
+    // FIGURE 10 — Regulatory Excellence Ranking
+    // ══════════════════════════════════════════════════════════
+    (function drawFig10() {
+        const data = [
+            { country: "Senegal",   score: 0.892, priority: true },
+            { country: "Kenya",     score: 0.889, priority: true },
+            { country: "Uganda",    score: 0.885, priority: false },
+            { country: "Namibia",   score: 0.875, priority: false },
+            { country: "Tanzania",  score: 0.858, priority: false },
+            { country: "Zimbabwe",  score: 0.848, priority: false },
+            { country: "Rwanda",    score: 0.826, priority: false }
+        ];
+
+        const container = d3.select("#chart-fig10");
+        const containerWidth = container.node().getBoundingClientRect().width || 800;
+        const margin = { top: 20, right: 80, bottom: 40, left: 100 };
+        const width = Math.min(containerWidth, 900) - margin.left - margin.right;
+        const height = data.length * 52 + margin.top + margin.bottom;
+
+        const svg = container.append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height)
+            .attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height}`)
+            .attr("preserveAspectRatio", "xMidYMid meet");
+
+        const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+        const x = d3.scaleLinear().domain([0, 1]).range([0, width]);
+        const y = d3.scaleBand().domain(data.map(d => d.country)).range([0, height - margin.top - margin.bottom]).padding(0.3);
+
+        // Grid lines
+        g.append("g").attr("class", "grid")
+            .call(d3.axisBottom(x).ticks(5).tickSize(height - margin.top - margin.bottom).tickFormat(""))
+            .attr("transform", "translate(0,0)");
+
+        // X Axis
+        g.append("g").attr("class", "axis")
+            .attr("transform", `translate(0,${height - margin.top - margin.bottom})`)
+            .call(d3.axisBottom(x).ticks(5).tickFormat(d3.format(".2f")));
+
+        // Y Axis
+        g.append("g").attr("class", "axis")
+            .call(d3.axisLeft(y).tickSize(0).tickPadding(10))
+            .selectAll("text")
+            .style("font-size", "13px")
+            .style("font-weight", d => data.find(dd => dd.country === d).priority ? "700" : "400")
+            .style("fill", d => data.find(dd => dd.country === d).priority ? accentGold : "#b0bec5");
+
+        // Remove y-axis domain line
+        g.select(".axis path").style("stroke", "none");
+
+        // Bars
+        const bars = g.selectAll(".bar-fig10")
+            .data(data)
+            .enter()
+            .append("rect")
+            .attr("class", "bar-fig10")
+            .attr("y", d => y(d.country))
+            .attr("height", y.bandwidth())
+            .attr("x", 0)
+            .attr("width", 0)
+            .attr("rx", 4)
+            .attr("ry", 4)
+            .attr("fill", d => d.priority ? accentGold : mutedBar)
+            .attr("opacity", d => d.priority ? 1 : 0.7)
+            .style("cursor", "pointer")
+            .on("mouseover", function(event, d) {
+                d3.select(this).attr("opacity", 1).attr("filter", "brightness(1.2)");
+                showTooltip(event,
+                    `<div class="tt-title">${d.country}</div>` +
+                    `<div class="tt-value">ERI Score: <strong style="color:${d.priority ? accentGold : '#fff'}">${d.score.toFixed(3)}</strong></div>` +
+                    `<div class="tt-value">Rank: #${data.indexOf(d) + 1}</div>` +
+                    (d.priority ? `<div class="tt-value" style="color:${accentGold}; margin-top:4px;">&#9733; Priority Market</div>` : '')
+                );
+            })
+            .on("mousemove", moveTooltip)
+            .on("mouseout", function(event, d) {
+                d3.select(this).attr("opacity", d.priority ? 1 : 0.7).attr("filter", "none");
+                hideTooltip();
+            });
+
+        // Animate bars
+        bars.transition()
+            .duration(900)
+            .delay((d, i) => i * 80)
+            .ease(d3.easeCubicOut)
+            .attr("width", d => x(d.score));
+
+        // Score labels
+        g.selectAll(".score-label-fig10")
+            .data(data)
+            .enter()
+            .append("text")
+            .attr("x", d => x(d.score) + 8)
+            .attr("y", d => y(d.country) + y.bandwidth() / 2 + 5)
+            .attr("fill", d => d.priority ? accentGold : "#b0bec5")
+            .attr("font-size", "13px")
+            .attr("font-weight", "700")
+            .attr("opacity", 0)
+            .text(d => d.score.toFixed(3))
+            .transition()
+            .duration(600)
+            .delay((d, i) => 600 + i * 80)
+            .attr("opacity", 1);
+
+        // Rank badges
+        g.selectAll(".rank-badge-fig10")
+            .data(data)
+            .enter()
+            .append("text")
+            .attr("x", -8)
+            .attr("y", d => y(d.country) + y.bandwidth() / 2 + 4)
+            .attr("text-anchor", "end")
+            .attr("fill", d => d.priority ? accentGold : "rgba(255,255,255,0.3)")
+            .attr("font-size", "11px")
+            .attr("font-weight", "700")
+            .text((d, i) => `#${i + 1}`)
+            .attr("opacity", 0)
+            .transition()
+            .duration(500)
+            .delay((d, i) => 400 + i * 80)
+            .attr("opacity", 1);
+
+    })();
+
+
+    // ══════════════════════════════════════════════════════════
+    // FIGURE 11 — Market Size vs. Readiness Matrix
+    // ══════════════════════════════════════════════════════════
+    (function drawFig11() {
+        const data = [
+            { country: "South Africa",   readiness: 8.5, demand: 9,  tier: 1 },
+            { country: "Kenya",          readiness: 8.2, demand: 9,  tier: 1 },
+            { country: "Nigeria",        readiness: 7.8, demand: 10, tier: 1 },
+            { country: "Egypt",          readiness: 8.0, demand: 8,  tier: 2 },
+            { country: "Morocco",        readiness: 7.5, demand: 7,  tier: 2 },
+            { country: "Ghana",          readiness: 7.0, demand: 7,  tier: 2 },
+            { country: "Cote d'Ivoire",  readiness: 7.2, demand: 7,  tier: 2 },
+            { country: "Senegal",        readiness: 7.1, demand: 6,  tier: 3 }
+        ];
+
+        const container = d3.select("#chart-fig11");
+        const containerWidth = container.node().getBoundingClientRect().width || 800;
+        const margin = { top: 30, right: 40, bottom: 60, left: 60 };
+        const size = Math.min(containerWidth, 700);
+        const width = size - margin.left - margin.right;
+        const height = size * 0.75 - margin.top - margin.bottom;
+
+        const svg = container.append("svg")
+            .attr("width", size)
+            .attr("height", size * 0.75)
+            .attr("viewBox", `0 0 ${size} ${size * 0.75}`)
+            .attr("preserveAspectRatio", "xMidYMid meet");
+
+        const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+        const x = d3.scaleLinear().domain([6.5, 9]).range([0, width]);
+        const y = d3.scaleLinear().domain([5, 11]).range([height, 0]);
+
+        // Grid
+        g.append("g").attr("class", "grid")
+            .call(d3.axisBottom(x).ticks(5).tickSize(height).tickFormat(""))
+            .selectAll("line").attr("stroke", "rgba(255,255,255,0.05)");
+        g.append("g").attr("class", "grid")
+            .call(d3.axisLeft(y).ticks(6).tickSize(-width).tickFormat(""))
+            .selectAll("line").attr("stroke", "rgba(255,255,255,0.05)");
+        g.selectAll(".grid path").style("stroke", "none");
+
+        // Quadrant lines
+        const qx = 7.75;
+        const qy = 8;
+
+        g.append("line")
+            .attr("x1", x(qx)).attr("x2", x(qx))
+            .attr("y1", 0).attr("y2", height)
+            .attr("stroke", "rgba(255,255,255,0.2)")
+            .attr("stroke-dasharray", "6,4")
+            .attr("stroke-width", 1.5);
+
+        g.append("line")
+            .attr("x1", 0).attr("x2", width)
+            .attr("y1", y(qy)).attr("y2", y(qy))
+            .attr("stroke", "rgba(255,255,255,0.2)")
+            .attr("stroke-dasharray", "6,4")
+            .attr("stroke-width", 1.5);
+
+        // Quadrant labels
+        const qlabelStyle = { "font-size": "10px", "fill": "rgba(255,255,255,0.2)", "font-weight": "600", "letter-spacing": "1px" };
+
+        g.append("text").attr("x", x(8.4)).attr("y", y(10.3)).text("PRIME INVESTMENT")
+            .attr("text-anchor", "middle").style("font-size", "10px").style("fill", "rgba(245,197,66,0.35)").style("font-weight", "700").style("letter-spacing", "1.5px");
+
+        g.append("text").attr("x", x(7.1)).attr("y", y(10.3)).text("HIGH DEMAND /")
+            .attr("text-anchor", "middle").style("font-size", "9px").style("fill", "rgba(255,255,255,0.18)").style("font-weight", "600").style("letter-spacing", "1px");
+        g.append("text").attr("x", x(7.1)).attr("y", y(9.9)).text("BUILD READINESS")
+            .attr("text-anchor", "middle").style("font-size", "9px").style("fill", "rgba(255,255,255,0.18)").style("font-weight", "600").style("letter-spacing", "1px");
+
+        g.append("text").attr("x", x(8.4)).attr("y", y(5.7)).text("HIGH READINESS /")
+            .attr("text-anchor", "middle").style("font-size", "9px").style("fill", "rgba(255,255,255,0.18)").style("font-weight", "600").style("letter-spacing", "1px");
+        g.append("text").attr("x", x(8.4)).attr("y", y(5.3)).text("GROW DEMAND")
+            .attr("text-anchor", "middle").style("font-size", "9px").style("fill", "rgba(255,255,255,0.18)").style("font-weight", "600").style("letter-spacing", "1px");
+
+        g.append("text").attr("x", x(7.1)).attr("y", y(5.7)).text("EMERGING")
+            .attr("text-anchor", "middle").style("font-size", "9px").style("fill", "rgba(255,255,255,0.18)").style("font-weight", "600").style("letter-spacing", "1px");
+        g.append("text").attr("x", x(7.1)).attr("y", y(5.3)).text("OPPORTUNITY")
+            .attr("text-anchor", "middle").style("font-size", "9px").style("fill", "rgba(255,255,255,0.18)").style("font-weight", "600").style("letter-spacing", "1px");
+
+        // Axes
+        g.append("g").attr("class", "axis")
+            .attr("transform", `translate(0,${height})`)
+            .call(d3.axisBottom(x).ticks(5).tickFormat(d3.format(".1f")));
+        g.append("g").attr("class", "axis")
+            .call(d3.axisLeft(y).ticks(6));
+
+        // Axis labels
+        svg.append("text")
+            .attr("x", margin.left + width / 2)
+            .attr("y", size * 0.75 - 8)
+            .attr("text-anchor", "middle")
+            .attr("fill", "#b0bec5")
+            .attr("font-size", "13px")
+            .text("Infrastructure Readiness Score");
+
+        svg.append("text")
+            .attr("transform", `rotate(-90)`)
+            .attr("x", -(margin.top + height / 2))
+            .attr("y", 16)
+            .attr("text-anchor", "middle")
+            .attr("fill", "#b0bec5")
+            .attr("font-size", "13px")
+            .text("Digital Demand Index (1-10)");
+
+        // Markers — circles with tier-based color
+        const circles = g.selectAll(".dot-fig11")
+            .data(data)
+            .enter()
+            .append("circle")
+            .attr("class", "dot-fig11")
+            .attr("cx", d => x(d.readiness))
+            .attr("cy", d => y(d.demand))
+            .attr("r", 0)
+            .attr("fill", d => tierColors[d.tier])
+            .attr("fill-opacity", 0.85)
+            .attr("stroke", d => tierColors[d.tier])
+            .attr("stroke-width", 2)
+            .attr("stroke-opacity", 0.4)
+            .style("cursor", "pointer")
+            .on("mouseover", function(event, d) {
+                d3.select(this).transition().duration(200).attr("r", 14).attr("fill-opacity", 1).attr("stroke-opacity", 0.8);
+                const tierLabels = { 1: "Tier 1 (Ready 2026-2028)", 2: "Tier 2 (Ready 2028-2030)", 3: "Tier 3 (Ready 2030+)" };
+                showTooltip(event,
+                    `<div class="tt-title">${d.country}</div>` +
+                    `<div class="tt-value">Readiness: <strong>${d.readiness}</strong></div>` +
+                    `<div class="tt-value">Digital Demand: <strong>${d.demand}/10</strong></div>` +
+                    `<div class="tt-value" style="color:${tierColors[d.tier]}; margin-top:4px;">${tierLabels[d.tier]}</div>`
+                );
+            })
+            .on("mousemove", moveTooltip)
+            .on("mouseout", function(event, d) {
+                d3.select(this).transition().duration(200).attr("r", 10).attr("fill-opacity", 0.85).attr("stroke-opacity", 0.4);
+                hideTooltip();
+            });
+
+        circles.transition()
+            .duration(700)
+            .delay((d, i) => 200 + i * 100)
+            .ease(d3.easeBackOut.overshoot(1.5))
+            .attr("r", 10);
+
+        // Country labels
+        const labelOffsets = {
+            "South Africa": { dx: 14, dy: -10 },
+            "Kenya":        { dx: 14, dy: 4 },
+            "Nigeria":      { dx: 14, dy: -10 },
+            "Egypt":        { dx: 14, dy: -10 },
+            "Morocco":      { dx: 14, dy: -10 },
+            "Ghana":        { dx: -14, dy: 12 },
+            "Cote d'Ivoire":{ dx: 14, dy: 10 },
+            "Senegal":      { dx: 14, dy: 5 }
+        };
+
+        g.selectAll(".label-fig11")
+            .data(data)
+            .enter()
+            .append("text")
+            .attr("class", "label-fig11")
+            .attr("x", d => x(d.readiness) + (labelOffsets[d.country]?.dx || 14))
+            .attr("y", d => y(d.demand) + (labelOffsets[d.country]?.dy || 0))
+            .attr("fill", d => tierColors[d.tier])
+            .attr("font-size", "11px")
+            .attr("font-weight", "600")
+            .attr("text-anchor", d => (labelOffsets[d.country]?.dx || 14) < 0 ? "end" : "start")
+            .text(d => d.country === "Cote d'Ivoire" ? "C\u00f4te d'Ivoire" : d.country)
+            .attr("opacity", 0)
+            .transition()
+            .duration(500)
+            .delay((d, i) => 700 + i * 80)
+            .attr("opacity", 1);
+
+        // Legend
+        const legendData = [
+            { label: "Tier 1 (2026-2028)", color: tierColors[1] },
+            { label: "Tier 2 (2028-2030)", color: tierColors[2] },
+            { label: "Tier 3 (2030+)", color: tierColors[3] }
+        ];
+        const legendContainer = d3.select("#legend-fig11");
+        legendData.forEach(item => {
+            const el = legendContainer.append("div").attr("class", "legend-item");
+            el.append("div").attr("class", "legend-swatch").style("background", item.color).style("border-radius", "50%");
+            el.append("span").text(item.label);
+        });
+
+    })();
+
+
+    // ══════════════════════════════════════════════════════════
+    // FIGURE 12 — AfDB Fund Allocation Timeline
+    // ══════════════════════════════════════════════════════════
+    (function drawFig12() {
+        const phases = [
+            {
+                phase: "Phase 1",
+                years: "2026-2028",
+                yearRange: [2026, 2028],
+                total: 6.5,
+                segments: [
+                    { label: "South Africa", value: 3.0, color: "#f5c542" },
+                    { label: "Kenya",        value: 2.0, color: "#4fc3f7" },
+                    { label: "Nigeria",      value: 1.5, color: "#66bb6a" }
+                ]
+            },
+            {
+                phase: "Phase 2",
+                years: "2029-2030",
+                yearRange: [2029, 2030],
+                total: 2.25,
+                segments: [
+                    { label: "Egypt",        value: 1.0,  color: "#ffa726" },
+                    { label: "Morocco",      value: 0.75, color: "#ab47bc" },
+                    { label: "Ghana/CI",     value: 0.5,  color: "#26c6da" }
+                ]
+            },
+            {
+                phase: "Reserve",
+                years: "Throughout",
+                yearRange: [2026, 2030],
+                total: 1.25,
+                segments: [
+                    { label: "Skills",      value: 0.5,  color: "#78909c" },
+                    { label: "R&D",         value: 0.5,  color: "#90a4ae" },
+                    { label: "Regulatory",  value: 0.25, color: "#b0bec5" }
+                ]
+            }
+        ];
+
+        const container = d3.select("#chart-fig12");
+        const containerWidth = container.node().getBoundingClientRect().width || 800;
+        const margin = { top: 40, right: 60, bottom: 70, left: 120 };
+        const width = Math.min(containerWidth, 900) - margin.left - margin.right;
+        const height = 320 - margin.top - margin.bottom;
+
+        const svg = container.append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height + margin.top + margin.bottom + 30)
+            .attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height + margin.top + margin.bottom + 30}`)
+            .attr("preserveAspectRatio", "xMidYMid meet");
+
+        const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+        // Scales
+        const xTime = d3.scaleLinear().domain([2026, 2031]).range([0, width]);
+        const yBand = d3.scaleBand().domain(phases.map(d => d.phase)).range([0, height]).padding(0.25);
+        const xMoney = d3.scaleLinear().domain([0, 10]).range([0, width]);
+
+        // Year axis at top
+        const years = [2026, 2027, 2028, 2029, 2030];
+        g.selectAll(".year-line")
+            .data(years)
+            .enter()
+            .append("line")
+            .attr("x1", d => xTime(d))
+            .attr("x2", d => xTime(d))
+            .attr("y1", -10)
+            .attr("y2", height + 10)
+            .attr("stroke", "rgba(255,255,255,0.08)")
+            .attr("stroke-dasharray", "3,3");
+
+        g.selectAll(".year-label")
+            .data(years)
+            .enter()
+            .append("text")
+            .attr("x", d => xTime(d))
+            .attr("y", -18)
+            .attr("text-anchor", "middle")
+            .attr("fill", "#b0bec5")
+            .attr("font-size", "12px")
+            .attr("font-weight", "600")
+            .text(d => d);
+
+        // Phase labels on left
+        g.selectAll(".phase-label")
+            .data(phases)
+            .enter()
+            .append("text")
+            .attr("x", -12)
+            .attr("y", d => yBand(d.phase) + yBand.bandwidth() / 2)
+            .attr("text-anchor", "end")
+            .attr("dominant-baseline", "middle")
+            .attr("fill", "#ffffff")
+            .attr("font-size", "14px")
+            .attr("font-weight", "700")
+            .text(d => d.phase);
+
+        // Stacked bars within time ranges
+        phases.forEach((phase, pi) => {
+            const barY = yBand(phase.phase);
+            const barHeight = yBand.bandwidth();
+            const barX1 = xTime(phase.yearRange[0]);
+            const barX2 = xTime(phase.yearRange[1] + 1); // end of last year
+            const barWidth = barX2 - barX1;
+
+            // Background track
+            g.append("rect")
+                .attr("x", barX1)
+                .attr("y", barY)
+                .attr("width", barWidth)
+                .attr("height", barHeight)
+                .attr("fill", "rgba(255,255,255,0.03)")
+                .attr("rx", 6);
+
+            // Stacked segments
+            let cumulative = 0;
+            phase.segments.forEach((seg, si) => {
+                const segWidth = (seg.value / phase.total) * barWidth;
+                const segX = barX1 + (cumulative / phase.total) * barWidth;
+
+                g.append("rect")
+                    .attr("x", segX)
+                    .attr("y", barY)
+                    .attr("width", 0)
+                    .attr("height", barHeight)
+                    .attr("fill", seg.color)
+                    .attr("opacity", 0.85)
+                    .attr("rx", si === 0 ? 6 : 0)
+                    .attr("ry", si === 0 ? 6 : 0)
+                    .style("cursor", "pointer")
+                    .on("mouseover", function(event) {
+                        d3.select(this).attr("opacity", 1);
+                        showTooltip(event,
+                            `<div class="tt-title">${seg.label}</div>` +
+                            `<div class="tt-value">${phase.phase} (${phase.years})</div>` +
+                            `<div class="tt-value">Allocation: <strong style="color:${seg.color}">$${seg.value.toFixed(2)}B</strong></div>` +
+                            `<div class="tt-value">Share of phase: ${((seg.value / phase.total) * 100).toFixed(0)}%</div>`
+                        );
+                    })
+                    .on("mousemove", moveTooltip)
+                    .on("mouseout", function() {
+                        d3.select(this).attr("opacity", 0.85);
+                        hideTooltip();
+                    })
+                    .transition()
+                    .duration(800)
+                    .delay(pi * 200 + si * 100)
+                    .ease(d3.easeCubicOut)
+                    .attr("width", segWidth);
+
+                // Segment label (if wide enough)
+                if (segWidth > 50) {
+                    g.append("text")
+                        .attr("x", segX + segWidth / 2)
+                        .attr("y", barY + barHeight / 2 - 6)
+                        .attr("text-anchor", "middle")
+                        .attr("dominant-baseline", "middle")
+                        .attr("fill", "#1a1a2e")
+                        .attr("font-size", "11px")
+                        .attr("font-weight", "700")
+                        .text(seg.label)
+                        .attr("opacity", 0)
+                        .transition()
+                        .duration(400)
+                        .delay(pi * 200 + si * 100 + 600)
+                        .attr("opacity", 1);
+
+                    g.append("text")
+                        .attr("x", segX + segWidth / 2)
+                        .attr("y", barY + barHeight / 2 + 8)
+                        .attr("text-anchor", "middle")
+                        .attr("dominant-baseline", "middle")
+                        .attr("fill", "rgba(26,26,46,0.7)")
+                        .attr("font-size", "10px")
+                        .attr("font-weight", "600")
+                        .text(`$${seg.value}B`)
+                        .attr("opacity", 0)
+                        .transition()
+                        .duration(400)
+                        .delay(pi * 200 + si * 100 + 700)
+                        .attr("opacity", 1);
+                }
+
+                cumulative += seg.value;
+            });
+
+            // Total label at end of bar
+            g.append("text")
+                .attr("x", barX2 + 8)
+                .attr("y", barY + barHeight / 2 + 1)
+                .attr("dominant-baseline", "middle")
+                .attr("fill", accentGold)
+                .attr("font-size", "14px")
+                .attr("font-weight", "700")
+                .text(`$${phase.total}B`)
+                .attr("opacity", 0)
+                .transition()
+                .duration(400)
+                .delay(pi * 200 + 800)
+                .attr("opacity", 1);
+        });
+
+        // Cumulative spending line
+        const cumulativeData = [
+            { year: 2026, cumulative: 2.17 + 0.25 },  // ~1/3 of Phase 1 + reserve portion
+            { year: 2027, cumulative: 4.33 + 0.50 },
+            { year: 2028, cumulative: 6.50 + 0.75 },
+            { year: 2029, cumulative: 6.50 + 1.125 + 1.00 },
+            { year: 2030, cumulative: 10.0 }
+        ];
+
+        const yCum = d3.scaleLinear().domain([0, 10.5]).range([height, 0]);
+
+        const line = d3.line()
+            .x(d => xTime(d.year + 0.5))
+            .y(d => yCum(d.cumulative))
+            .curve(d3.curveMonotoneX);
+
+        const linePath = g.append("path")
+            .datum(cumulativeData)
+            .attr("fill", "none")
+            .attr("stroke", accentGold)
+            .attr("stroke-width", 2.5)
+            .attr("stroke-dasharray", "6,3")
+            .attr("d", line)
+            .attr("opacity", 0);
+
+        linePath.transition().duration(1200).delay(1000).attr("opacity", 0.7);
+
+        // Cumulative dots
+        g.selectAll(".cum-dot")
+            .data(cumulativeData)
+            .enter()
+            .append("circle")
+            .attr("cx", d => xTime(d.year + 0.5))
+            .attr("cy", d => yCum(d.cumulative))
+            .attr("r", 0)
+            .attr("fill", accentGold)
+            .attr("stroke", "#1a1a2e")
+            .attr("stroke-width", 2)
+            .style("cursor", "pointer")
+            .on("mouseover", function(event, d) {
+                d3.select(this).transition().duration(150).attr("r", 7);
+                showTooltip(event,
+                    `<div class="tt-title">End of ${d.year}</div>` +
+                    `<div class="tt-value">Cumulative: <strong style="color:${accentGold}">$${d.cumulative.toFixed(2)}B</strong></div>` +
+                    `<div class="tt-value">${((d.cumulative / 10) * 100).toFixed(0)}% of total fund deployed</div>`
+                );
+            })
+            .on("mousemove", moveTooltip)
+            .on("mouseout", function() {
+                d3.select(this).transition().duration(150).attr("r", 4.5);
+                hideTooltip();
+            })
+            .transition()
+            .duration(400)
+            .delay((d, i) => 1200 + i * 100)
+            .attr("r", 4.5);
+
+        // Cumulative label
+        g.append("text")
+            .attr("x", xTime(2030.5) + 8)
+            .attr("y", yCum(10) - 2)
+            .attr("fill", accentGold)
+            .attr("font-size", "11px")
+            .attr("font-weight", "600")
+            .attr("opacity", 0)
+            .text("$10B Total")
+            .transition().duration(400).delay(1600).attr("opacity", 0.8);
+
+        // Cumulative axis label (right side)
+        g.append("text")
+            .attr("x", width + 8)
+            .attr("y", height + 22)
+            .attr("fill", "rgba(245,197,66,0.5)")
+            .attr("font-size", "10px")
+            .attr("font-weight", "600")
+            .text("Cumulative $B \u2192")
+            .attr("opacity", 0)
+            .transition().duration(400).delay(1400).attr("opacity", 1);
+
+        // Legend
+        const allSegments = phases.flatMap(p => p.segments);
+        const uniqueLabels = [];
+        const seen = new Set();
+        allSegments.forEach(s => {
+            if (!seen.has(s.label)) {
+                seen.add(s.label);
+                uniqueLabels.push(s);
+            }
+        });
+
+        const legendContainer = d3.select("#legend-fig12");
+        uniqueLabels.forEach(item => {
+            const el = legendContainer.append("div").attr("class", "legend-item");
+            el.append("div").attr("class", "legend-swatch").style("background", item.color);
+            el.append("span").text(item.label);
+        });
+        // Cumulative line legend
+        const cumLeg = legendContainer.append("div").attr("class", "legend-item");
+        cumLeg.append("div").attr("class", "legend-swatch").style("background", "transparent").style("border", `2px dashed ${accentGold}`).style("width", "16px").style("height", "2px").style("border-radius", "0");
+        cumLeg.append("span").text("Cumulative Spend");
+
+    })();
+
+
+    // ══════════════════════════════════════════════════════════
+    // FIGURE 13 — Broadband Speed Leaders
+    // ══════════════════════════════════════════════════════════
+    (function drawFig13() {
+        const data = [
+            { country: "Egypt",          speed: 84.52, priority: true,  rank: 1 },
+            { country: "Cote d'Ivoire",  speed: 59.93, priority: true,  rank: 2 },
+            { country: "Mauritius",      speed: 51.96, priority: false, rank: 3 },
+            { country: "Ghana",          speed: 51.24, priority: true,  rank: 4 },
+            { country: "South Africa",   speed: 48.49, priority: true,  rank: 5 },
+            { country: "Burkina Faso",   speed: 48.05, priority: false, rank: 6 },
+            { country: "Gabon",          speed: 42.84, priority: false, rank: 7 },
+            { country: "Rwanda",         speed: 41.30, priority: false, rank: 8 },
+            { country: "DR Congo",       speed: 38.45, priority: false, rank: 9 },
+            { country: "Morocco",        speed: 36.37, priority: true,  rank: 10 },
+            { country: "Kenya",          speed: 35.00, priority: true,  rank: 11 },
+            { country: "Senegal",        speed: 30.00, priority: true,  rank: 12 },
+            { country: "Nigeria",        speed: 22.00, priority: true,  rank: 13 }
+        ];
+
+        const container = d3.select("#chart-fig13");
+        const containerWidth = container.node().getBoundingClientRect().width || 800;
+        const margin = { top: 20, right: 90, bottom: 40, left: 130 };
+        const width = Math.min(containerWidth, 900) - margin.left - margin.right;
+        const height = data.length * 42 + margin.top + margin.bottom;
+
+        const svg = container.append("svg")
+            .attr("width", width + margin.left + margin.right)
+            .attr("height", height)
+            .attr("viewBox", `0 0 ${width + margin.left + margin.right} ${height}`)
+            .attr("preserveAspectRatio", "xMidYMid meet");
+
+        const g = svg.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+
+        const x = d3.scaleLinear().domain([0, 95]).range([0, width]);
+        const y = d3.scaleBand().domain(data.map(d => d.country)).range([0, height - margin.top - margin.bottom]).padding(0.25);
+
+        // Grid
+        g.append("g").attr("class", "grid")
+            .call(d3.axisBottom(x).ticks(5).tickSize(height - margin.top - margin.bottom).tickFormat(""))
+            .attr("transform", "translate(0,0)");
+
+        // Separator line between top 10 and below
+        const separatorY = y("Morocco") + y.bandwidth() + y.step() * y.padding() / 2;
+        g.append("line")
+            .attr("x1", -margin.left + 10)
+            .attr("x2", width)
+            .attr("y1", separatorY)
+            .attr("y2", separatorY)
+            .attr("stroke", "rgba(255,255,255,0.15)")
+            .attr("stroke-dasharray", "4,4");
+
+        g.append("text")
+            .attr("x", width)
+            .attr("y", separatorY + 14)
+            .attr("text-anchor", "end")
+            .attr("fill", "rgba(255,255,255,0.3)")
+            .attr("font-size", "10px")
+            .attr("font-style", "italic")
+            .text("Below Top 10 \u2193");
+
+        // X Axis
+        g.append("g").attr("class", "axis")
+            .attr("transform", `translate(0,${height - margin.top - margin.bottom})`)
+            .call(d3.axisBottom(x).ticks(5).tickFormat(d => d + " Mbps"));
+
+        // Y Axis
+        g.append("g").attr("class", "axis")
+            .call(d3.axisLeft(y).tickSize(0).tickPadding(10))
+            .selectAll("text")
+            .style("font-size", "12px")
+            .style("font-weight", d => {
+                const item = data.find(dd => dd.country === d);
+                return item && item.priority ? "700" : "400";
+            })
+            .style("fill", d => {
+                const item = data.find(dd => dd.country === d);
+                return item && item.priority ? accentGold : "#78909c";
+            })
+            .text(d => {
+                if (d === "Cote d'Ivoire") return "C\u00f4te d'Ivoire";
+                return d;
+            });
+
+        g.select(".axis path").style("stroke", "none");
+
+        // Bars
+        g.selectAll(".bar-fig13")
+            .data(data)
+            .enter()
+            .append("rect")
+            .attr("class", "bar-fig13")
+            .attr("y", d => y(d.country))
+            .attr("height", y.bandwidth())
+            .attr("x", 0)
+            .attr("width", 0)
+            .attr("rx", 4)
+            .attr("ry", 4)
+            .attr("fill", d => d.priority ? accentGold : mutedBar)
+            .attr("opacity", d => d.priority ? 0.9 : 0.5)
+            .style("cursor", "pointer")
+            .on("mouseover", function(event, d) {
+                d3.select(this).attr("opacity", 1);
+                showTooltip(event,
+                    `<div class="tt-title">${d.country === "Cote d'Ivoire" ? "C\u00f4te d'Ivoire" : d.country}</div>` +
+                    `<div class="tt-value">Speed: <strong style="color:${d.priority ? accentGold : '#fff'}">${d.speed.toFixed(2)} Mbps</strong></div>` +
+                    `<div class="tt-value">Africa Rank: #${d.rank}</div>` +
+                    (d.priority ? `<div class="tt-value" style="color:${accentGold}; margin-top:4px;">&#9733; Priority Market</div>` : '<div class="tt-value" style="color:#78909c; margin-top:4px;">Not in priority markets</div>')
+                );
+            })
+            .on("mousemove", moveTooltip)
+            .on("mouseout", function(event, d) {
+                d3.select(this).attr("opacity", d.priority ? 0.9 : 0.5);
+                hideTooltip();
+            })
+            .transition()
+            .duration(800)
+            .delay((d, i) => i * 60)
+            .ease(d3.easeCubicOut)
+            .attr("width", d => x(d.speed));
+
+        // Speed labels
+        g.selectAll(".speed-label-fig13")
+            .data(data)
+            .enter()
+            .append("text")
+            .attr("x", d => x(d.speed) + 8)
+            .attr("y", d => y(d.country) + y.bandwidth() / 2 + 4)
+            .attr("fill", d => d.priority ? accentGold : "#78909c")
+            .attr("font-size", "12px")
+            .attr("font-weight", "700")
+            .text(d => d.speed.toFixed(2))
+            .attr("opacity", 0)
+            .transition()
+            .duration(400)
+            .delay((d, i) => 500 + i * 60)
+            .attr("opacity", 1);
+
+        // Priority market indicators (star)
+        g.selectAll(".star-fig13")
+            .data(data.filter(d => d.priority))
+            .enter()
+            .append("text")
+            .attr("x", -margin.left + 8)
+            .attr("y", d => y(d.country) + y.bandwidth() / 2 + 4)
+            .attr("fill", accentGold)
+            .attr("font-size", "12px")
+            .text("\u2605")
+            .attr("opacity", 0)
+            .transition()
+            .duration(400)
+            .delay((d, i) => 800 + i * 60)
+            .attr("opacity", 0.7);
+
+    })();
+
+
+    // ══════════════════════════════════════════════════════════
+    // Scroll-triggered Animations
+    // ══════════════════════════════════════════════════════════
+    const animObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.style.opacity = "1";
+                entry.target.style.transform = "translateY(0)";
+            }
+        });
+    }, { threshold: 0.05 });
+
+    document.querySelectorAll(".card, .summary-card, .summary-section").forEach(el => {
+        el.style.opacity = "0";
+        el.style.transform = "translateY(24px)";
+        el.style.transition = "opacity 0.7s ease, transform 0.7s ease";
+        animObserver.observe(el);
+    });
+
+    // Make cards visible after a short delay if already in viewport
+    setTimeout(() => {
+        document.querySelectorAll(".card, .summary-card, .summary-section").forEach(el => {
+            const rect = el.getBoundingClientRect();
+            if (rect.top < window.innerHeight) {
+                el.style.opacity = "1";
+                el.style.transform = "translateY(0)";
+            }
+        });
+    }, 100);
+
+})();
+</script>
+
+</body>
+</html>
